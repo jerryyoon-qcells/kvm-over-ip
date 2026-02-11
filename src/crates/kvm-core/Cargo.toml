@@ -1,0 +1,32 @@
+[package]
+name = "kvm-core"
+description = "Shared protocol, domain entities, and key translation tables for KVM-Over-IP"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+bincode = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+mockall = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "codec_bench"
+harness = false
+
+[[bench]]
+name = "layout_bench"
+harness = false
+
+[[bench]]
+name = "keymap_bench"
+harness = false

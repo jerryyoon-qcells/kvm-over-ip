@@ -1,0 +1,49 @@
+[package]
+name = "kvm-client"
+description = "KVM-Over-IP client application (Windows, Linux, macOS)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+name = "kvm_client"
+path = "src/lib.rs"
+
+[[bin]]
+name = "kvm-client"
+path = "src/main.rs"
+
+[dependencies]
+kvm-core = { path = "../kvm-core" }
+tokio = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+toml = { workspace = true }
+async-trait = "0.1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# X11 bindings for XTest input emulation and screen enumeration
+x11 = { version = "2.21", features = ["xlib", "xtst"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Core Graphics for screen enumeration
+core-graphics = "0.23"
+
+[dev-dependencies]
+mockall = { workspace = true }
+tokio-test = { workspace = true }
+tokio = { workspace = true }
