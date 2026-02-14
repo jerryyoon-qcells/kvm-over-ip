@@ -1,0 +1,432 @@
+# =============================================================================
+# CI Workflow: kvm-over-ip Continuous Integration
+# =============================================================================
+#
+# PURPOSE:
+#   This workflow runs on every push to `main` and on every pull request
+#   targeting `main`. Its job is to catch problems early: formatting issues,
+#   lint warnings, compilation errors, and failing tests.
+#
+# WHAT IT DOES (high level):
+#   1. Rust jobs  – format check, Clippy lint, build, and test the entire
+#      Cargo workspace across Windows, Ubuntu, and macOS.
+#   2. TypeScript jobs – ESLint, Jest (with coverage), and tsc type-check for
+#      both `ui-master` and `ui-client` React packages.
+#
+# PLATFORM NOTES:
+#   - kvm-master uses Windows-only APIs (WH_MOUSE_LL / WH_KEYBOARD_LL).
+#     Its Windows-specific module only compiles on Windows, so `cargo build`
+#     on Linux/macOS simply omits that code (conditional compilation).
+#   - kvm-client has separate platform modules for Windows, Linux, and macOS,
+#     each compiled only on the matching OS.
+#   - kvm-core and kvm-web-bridge are fully cross-platform; they compile and
+#     test identically on all three OSes.
+#
+# CACHING STRATEGY:
+#   - Rust: the Cargo registry download cache and the `target/` build cache
+#     are preserved between runs so that unchanged crates are not recompiled.
+#   - npm: the `node_modules` directories inside each UI package are cached
+#     using the package-lock.json hash as the cache key.
+
+name: CI
+
+# ---------------------------------------------------------------------------
+# TRIGGERS
+# ---------------------------------------------------------------------------
+# `push` – run on every commit pushed to the main branch.
+# `pull_request` – run on every PR that targets main (including updates to
+#                  the PR branch).
+# ---------------------------------------------------------------------------
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# ---------------------------------------------------------------------------
+# CONCURRENCY
+# ---------------------------------------------------------------------------
+# If a new push arrives while an earlier run for the same branch/PR is still
+# in progress, cancel the in-progress run. This keeps queues clean and saves
+# runner-minutes without sacrificing correctness.
+# ---------------------------------------------------------------------------
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# ---------------------------------------------------------------------------
+# DEFAULT SHELL
+# ---------------------------------------------------------------------------
+# Use `bash` everywhere. On Windows, GitHub Actions runners have Git Bash
+# available, so this gives a consistent scripting environment across all three
+# OSes without writing OS-specific shell scripts.
+# ---------------------------------------------------------------------------
+defaults:
+  run:
+    shell: bash
+
+# =============================================================================
+# JOBS
+# =============================================================================
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # JOB: rust-fmt
+  # ---------------------------------------------------------------------------
+  # Checks that every Rust source file in the workspace is formatted according
+  # to `rustfmt`. This is a cheap, fast job — it does not compile anything.
+  #
+  # Why only run on ubuntu-latest?
+  #   `rustfmt` output is identical on all platforms (it is a pure text
+  #   transformation), so there is no benefit running the same check three
+  #   times. Ubuntu is the fastest runner for this purpose.
+  # ---------------------------------------------------------------------------
+  rust-fmt:
+    name: Rust – Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the repository so the workflow has access to the code.
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Step 2: Install the Rust toolchain.
+      #   `stable` is the current stable release of Rust.
+      #   `rustfmt` is the auto-formatter component.
+      #   `dtolnay/rust-toolchain` is a well-maintained community action that
+      #   installs Rust toolchains faster than `rustup` commands.
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      # Step 3: Cache the Cargo registry (downloaded crate sources).
+      #   Without caching, every run downloads all dependencies from crates.io.
+      #   The cache key includes the OS and the hash of all Cargo.lock files so
+      #   the cache is invalidated when dependencies change.
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('src/**/Cargo.lock', 'src/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      # Step 4: Run the format check.
+      #   `--manifest-path` points Cargo at the workspace Cargo.toml, which
+      #   lives in `src/`, NOT the repository root.
+      #   `--all` checks every crate in the workspace.
+      #   `--check` makes rustfmt exit with a non-zero code if any file would
+      #   be reformatted (without actually writing changes). This lets the CI
+      #   fail fast and tell the developer to run `cargo fmt` locally.
+      - name: cargo fmt --check
+        run: cargo fmt --manifest-path src/Cargo.toml --all --check
+
+  # ---------------------------------------------------------------------------
+  # JOB: rust-clippy
+  # ---------------------------------------------------------------------------
+  # Runs Clippy, Rust's official lint tool. Clippy catches common mistakes,
+  # performance anti-patterns, and style issues that the compiler itself does
+  # not flag. `-D warnings` treats every warning as an error, ensuring the
+  # codebase stays lint-clean.
+  #
+  # Why only on ubuntu-latest?
+  #   Most Clippy lints are platform-agnostic. The Windows-specific code is
+  #   guarded by `#[cfg(target_os = "windows")]` so it is simply skipped when
+  #   compiling on Ubuntu. Platform-specific lint issues are caught by the
+  #   full build matrix (rust-build job below).
+  # ---------------------------------------------------------------------------
+  rust-clippy:
+    name: Rust – Clippy Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      # Install system libraries required by kvm-client on Linux.
+      #   x11-dev and libxtst-dev provide the X11 and XTest headers that the
+      #   `x11` crate (used by the Linux input-emulation module) needs.
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libx11-dev \
+            libxtst-dev
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('src/**/Cargo.lock', 'src/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      # Cache the build artifacts produced during Clippy.
+      #   This is keyed on the OS, the Rust toolchain version, and the content
+      #   of all Cargo.toml/Cargo.lock files. If any of these change, the cache
+      #   is busted and Cargo rebuilds from scratch.
+      - name: Cache Cargo build target directory
+        uses: actions/cache@v4
+        with:
+          path: src/target
+          key: ${{ runner.os }}-cargo-target-clippy-${{ hashFiles('src/**/Cargo.toml', 'src/**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-clippy-
+            ${{ runner.os }}-cargo-target-
+
+      # Run Clippy across the entire workspace.
+      #   `-- -D warnings` passes the flag to the Rust compiler, escalating
+      #   all warnings to errors. This prevents lint issues from accumulating
+      #   silently over time.
+      - name: cargo clippy -- -D warnings
+        run: cargo clippy --manifest-path src/Cargo.toml --workspace -- -D warnings
+
+  # ---------------------------------------------------------------------------
+  # JOB: rust-build-and-test
+  # ---------------------------------------------------------------------------
+  # Compiles and tests every crate in the workspace on all three platforms.
+  # Using a matrix lets GitHub Actions run the three OS variants in parallel,
+  # so total CI wall-clock time is roughly the same as running on one platform.
+  #
+  # MATRIX AXES:
+  #   os: [ubuntu-latest, windows-latest, macos-latest]
+  #     Each combination produces an independent job with its own runner.
+  #
+  # PLATFORM-SPECIFIC HANDLING:
+  #   Linux   – installs libx11-dev and libxtst-dev for the X11/XTest APIs
+  #             used by kvm-client's Linux input-emulation backend.
+  #   macOS   – no extra system deps needed; CoreGraphics is part of macOS SDK.
+  #   Windows – no extra system deps; the `windows` crate links against the
+  #             Windows SDK that ships with Visual Studio on the runner image.
+  # ---------------------------------------------------------------------------
+  rust-build-and-test:
+    name: Rust – Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # `fail-fast: false` means that if, say, the Windows job fails, the
+      # Linux and macOS jobs still complete. This lets you see all failures at
+      # once instead of fixing them one OS at a time.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      # Install Linux-only system libraries.
+      #   `if: matrix.os == 'ubuntu-latest'` ensures this step is completely
+      #   skipped on Windows and macOS runners.
+      - name: Install Linux system dependencies (Ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libx11-dev \
+            libxtst-dev
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('src/**/Cargo.lock', 'src/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      # The build cache key includes the OS so Windows, Linux, and macOS each
+      # maintain their own independent caches (compiled artifacts are not
+      # portable between OSes).
+      - name: Cache Cargo build target directory
+        uses: actions/cache@v4
+        with:
+          path: src/target
+          key: ${{ runner.os }}-cargo-target-build-${{ hashFiles('src/**/Cargo.toml', 'src/**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-build-
+            ${{ runner.os }}-cargo-target-
+
+      # Build every crate in the workspace.
+      #   `--workspace` includes kvm-core, kvm-master, kvm-client, and
+      #   kvm-web-bridge. Platform-guarded modules (e.g., the Windows hook
+      #   code in kvm-master) are compiled only when the target OS matches.
+      - name: cargo build --workspace
+        run: cargo build --manifest-path src/Cargo.toml --workspace
+
+      # Run the full test suite for the workspace.
+      #
+      # IMPORTANT – platform-specific test isolation:
+      #   kvm-master's Windows hook tests are compiled with
+      #   `#[cfg(target_os = "windows")]` guards, so they are absent on
+      #   Linux/macOS and will not fail there.
+      #   kvm-client's platform backends are similarly gated.
+      #
+      # `--workspace` runs all test binaries (unit tests, integration tests,
+      # and doc-tests) for every crate in one invocation.
+      - name: cargo test --workspace
+        run: cargo test --manifest-path src/Cargo.toml --workspace
+
+  # ---------------------------------------------------------------------------
+  # JOB: ts-ui-master
+  # ---------------------------------------------------------------------------
+  # Runs the full TypeScript / React quality pipeline for the `ui-master`
+  # package (the layout editor used by the KVM master machine).
+  #
+  # Steps:
+  #   1. Install npm dependencies from the lock file (reproducible install).
+  #   2. Run ESLint (zero warnings allowed).
+  #   3. Run Jest with coverage reporting.
+  #   4. Run tsc --noEmit (pure type-checking without emitting JS files).
+  #
+  # Why only on ubuntu-latest?
+  #   Node.js and TypeScript/React tooling produce identical results on all
+  #   platforms. Running on a single fast Linux runner avoids tripling the
+  #   runner-minute cost for no additional signal. If cross-platform UI testing
+  #   is needed in the future, add a matrix here.
+  # ---------------------------------------------------------------------------
+  ts-ui-master:
+    name: TypeScript – ui-master (lint / test / typecheck)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        # All steps in this job execute inside the ui-master package directory.
+        working-directory: src/packages/ui-master
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Install the Node.js version that matches the project's requirements.
+      #   LTS 20 is the current Long-Term Support release (stable and well-
+      #   supported). `cache: 'npm'` enables the built-in npm dependency cache
+      #   provided by the setup-node action, keyed on package-lock.json.
+      - name: Set up Node.js 20 (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: src/packages/ui-master/package-lock.json
+
+      # `npm ci` (Clean Install) is preferred over `npm install` in CI because:
+      #   - It never modifies package-lock.json (fails if lock is out of sync).
+      #   - It deletes node_modules before installing (clean, reproducible).
+      #   - It is faster than `npm install` for CI environments.
+      - name: Install npm dependencies (npm ci)
+        run: npm ci
+
+      # ESLint enforces code style and catches common React/TypeScript bugs.
+      #   `--max-warnings 0` treats every warning as an error so the codebase
+      #   stays warning-free.
+      - name: Run ESLint
+        run: npm run lint
+
+      # Jest runs unit tests and reports coverage.
+      #   `--coverage` generates a coverage report.
+      #   `--passWithNoTests` allows the job to succeed when no test files
+      #   exist yet (useful during early development).
+      #   Coverage thresholds are enforced by jest.config.ts (80% minimum).
+      - name: Run Jest tests with coverage
+        run: npm run test:coverage
+
+      # tsc --noEmit performs a full type-check of the project without writing
+      # any output files. This catches type errors that Jest might miss because
+      # ts-jest can be configured to skip type checking for speed.
+      - name: TypeScript type check (tsc --noEmit)
+        run: npx tsc --noEmit
+
+  # ---------------------------------------------------------------------------
+  # JOB: ts-ui-client
+  # ---------------------------------------------------------------------------
+  # Mirrors ts-ui-master but for the `ui-client` package (the status display
+  # UI that runs on each client machine).
+  # ---------------------------------------------------------------------------
+  ts-ui-client:
+    name: TypeScript – ui-client (lint / test / typecheck)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: src/packages/ui-client
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20 (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: src/packages/ui-client/package-lock.json
+
+      - name: Install npm dependencies (npm ci)
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Jest tests with coverage
+        run: npm run test:coverage
+
+      - name: TypeScript type check (tsc --noEmit)
+        run: npx tsc --noEmit
+
+  # ---------------------------------------------------------------------------
+  # JOB: ci-gate
+  # ---------------------------------------------------------------------------
+  # A final summary job whose only purpose is to declare success when ALL
+  # preceding jobs pass. Branch protection rules should require THIS job,
+  # not the individual jobs. This way you only need one required-status-check
+  # entry in GitHub repository settings, and adding/renaming jobs in the
+  # matrix above does not break the protection rule.
+  # ---------------------------------------------------------------------------
+  ci-gate:
+    name: CI – All checks passed
+    runs-on: ubuntu-latest
+    # `needs` lists every job that must succeed before this one runs.
+    needs:
+      - rust-fmt
+      - rust-clippy
+      - rust-build-and-test
+      - ts-ui-master
+      - ts-ui-client
+    # Run this job even if the branch is protected; the `needs` list already
+    # handles the dependency.
+    if: always()
+
+    steps:
+      # Inspect the results of all dependent jobs and exit non-zero if any
+      # of them failed. The `contains` expression checks whether the JSON
+      # array of job results includes 'failure' or 'cancelled'.
+      - name: Check all jobs succeeded
+        run: |
+          echo "Checking CI gate results..."
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "ERROR: One or more CI jobs FAILED. See individual job logs above."
+            exit 1
+          fi
+          if [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "ERROR: One or more CI jobs were CANCELLED."
+            exit 1
+          fi
+          echo "All CI checks passed successfully."

@@ -1,0 +1,236 @@
+# =============================================================================
+# Dependabot Configuration
+# =============================================================================
+#
+# PURPOSE:
+#   Dependabot is a GitHub service that automatically scans your project's
+#   dependency manifests and opens pull requests when newer versions are
+#   available. This is especially important for security updates, where a
+#   dependency might have a published CVE (Common Vulnerabilities and
+#   Exposures) that Dependabot flags immediately.
+#
+# WHAT DEPENDABOT MONITORS HERE:
+#   1. Cargo (Rust) – the `src/Cargo.toml` workspace manifest and all crate
+#      `Cargo.toml` files within it. Dependabot reads `Cargo.lock` to
+#      understand the exact resolved versions of every transitive dependency.
+#
+#   2. npm (ui-master) – `src/packages/ui-master/package.json` and
+#      `package-lock.json`. This covers React, Zustand, Jest, ESLint, Vite,
+#      TypeScript, and all other JS/TS dependencies.
+#
+#   3. npm (ui-client) – `src/packages/ui-client/package.json`.
+#      Monitored separately from ui-master because they are independent
+#      packages with separate lock files.
+#
+#   4. GitHub Actions – the workflow YAML files under `.github/workflows/`.
+#      Dependabot watches for new versions of actions like `actions/checkout`,
+#      `dtolnay/rust-toolchain`, `softprops/action-gh-release`, etc., and
+#      opens PRs to bump the pinned versions.
+#
+# UPDATE SCHEDULE:
+#   `interval: weekly` opens PRs at most once per week. This batches minor
+#   updates together and avoids overwhelming the team with individual PRs for
+#   every patch release. Security advisories bypass the schedule and are
+#   raised immediately.
+#
+# GROUPING STRATEGY:
+#   Related packages are grouped into a single PR so that, e.g., all ESLint-
+#   related devDependency upgrades appear in one PR rather than six separate
+#   ones. This keeps the PR list manageable.
+#
+# LABELS:
+#   Each ecosystem has a distinct label so that PRs are easy to filter and
+#   route to the correct reviewer.
+#
+# DOCUMENTATION:
+#   https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+
+updates:
+
+  # ---------------------------------------------------------------------------
+  # ECOSYSTEM 1: Cargo (Rust)
+  # ---------------------------------------------------------------------------
+  # Monitors the Rust workspace rooted at `src/`.
+  # Dependabot reads `src/Cargo.toml` and the transitive closure of workspace
+  # member manifests to find all direct and indirect dependencies.
+  #
+  # NOTE: Cargo updates are grouped into two PRs:
+  #   - One PR for production dependencies (needed at runtime).
+  #   - One PR for development dependencies (only used in tests / benches).
+  # This separation prevents a flurry of dev-only updates from blocking
+  # production-critical reviews.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: cargo
+    # `directory` is relative to the repository root.
+    # The Rust workspace Cargo.toml lives in `src/`, NOT the repo root.
+    directory: /src
+    schedule:
+      interval: weekly
+      # Monday mornings: the team starts the week with a fresh set of PRs to
+      # review, and CI can validate them before the weekend work is merged.
+      day: monday
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    # Apply this label to all Cargo Dependabot PRs for easy filtering.
+    labels:
+      - dependencies
+      - rust
+    # Group all non-development Cargo updates into a single PR.
+    groups:
+      cargo-production:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      cargo-development:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+    # Cap the maximum number of open Dependabot PRs for this ecosystem.
+    # If more than 10 are already open, Dependabot waits before opening new ones.
+    open-pull-requests-limit: 10
+    # Commit message prefix for Dependabot PRs so they are identifiable in
+    # the git log and can be filtered in changelog generators.
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+
+  # ---------------------------------------------------------------------------
+  # ECOSYSTEM 2: npm – ui-master
+  # ---------------------------------------------------------------------------
+  # Monitors the React/TypeScript master UI package.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: npm
+    directory: /src/packages/ui-master
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    labels:
+      - dependencies
+      - javascript
+      - ui-master
+    groups:
+      # Group all testing-related devDependencies (Jest, Testing Library, etc.)
+      # into a single PR since they are typically upgraded together.
+      npm-ui-master-testing:
+        patterns:
+          - "jest*"
+          - "@jest/*"
+          - "ts-jest"
+          - "@testing-library/*"
+          - "jest-environment-*"
+        dependency-type: development
+      # Group all ESLint-related packages.
+      npm-ui-master-eslint:
+        patterns:
+          - "eslint*"
+          - "@typescript-eslint/*"
+          - "eslint-plugin-*"
+        dependency-type: development
+      # Group React and its type definitions.
+      npm-ui-master-react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      # Everything else (TypeScript, Vite, Prettier, etc.) goes into a
+      # general "tooling" group.
+      npm-ui-master-tooling:
+        patterns:
+          - "typescript"
+          - "vite"
+          - "@vitejs/*"
+          - "prettier"
+          - "ts-node"
+        dependency-type: development
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps/ui-master)"
+      include: scope
+
+  # ---------------------------------------------------------------------------
+  # ECOSYSTEM 3: npm – ui-client
+  # ---------------------------------------------------------------------------
+  # Monitors the React/TypeScript client UI package.
+  # Mirrors the ui-master grouping strategy for consistency.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: npm
+    directory: /src/packages/ui-client
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    labels:
+      - dependencies
+      - javascript
+      - ui-client
+    groups:
+      npm-ui-client-testing:
+        patterns:
+          - "jest*"
+          - "@jest/*"
+          - "ts-jest"
+          - "@testing-library/*"
+          - "jest-environment-*"
+        dependency-type: development
+      npm-ui-client-eslint:
+        patterns:
+          - "eslint*"
+          - "@typescript-eslint/*"
+          - "eslint-plugin-*"
+        dependency-type: development
+      npm-ui-client-react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      npm-ui-client-tooling:
+        patterns:
+          - "typescript"
+          - "vite"
+          - "@vitejs/*"
+          - "prettier"
+          - "ts-node"
+        dependency-type: development
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps/ui-client)"
+      include: scope
+
+  # ---------------------------------------------------------------------------
+  # ECOSYSTEM 4: GitHub Actions
+  # ---------------------------------------------------------------------------
+  # Monitors action versions referenced in `.github/workflows/*.yml`.
+  # Keeping actions up to date is important because:
+  #   - Outdated actions may use deprecated runner images or Node.js versions.
+  #   - Security vulnerabilities in actions can compromise the build pipeline.
+  #   - GitHub sometimes removes old action versions, causing workflows to fail.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: github-actions
+    # `.github/` is the standard location for workflow files.
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      # Group all GitHub Actions updates into a single PR.
+      github-actions-all:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(actions)"
+      include: scope
