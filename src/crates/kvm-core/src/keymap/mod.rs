@@ -2,6 +2,46 @@
 //!
 //! The canonical representation is USB HID Usage IDs (page 0x07, Keyboard/Keypad).
 //! Platform-specific codes are translated to/from HID at capture/emulation boundaries.
+//!
+//! # Why USB HID? (for beginners)
+//!
+//! Different operating systems use completely different numbering schemes for
+//! keyboard keys:
+//!
+//! | OS      | Key system        | Example: letter A |
+//! |---------|-------------------|-------------------|
+//! | Windows | Virtual Key (VK)  | 0x41              |
+//! | Linux   | X11 KeySym        | 0x0061            |
+//! | macOS   | CGKeyCode         | 0x00              |
+//! | Web     | DOM key code      | `"KeyA"`          |
+//!
+//! If we sent Windows VK codes over the network, a Linux client would receive
+//! 0x41 and have no idea what key that is.
+//!
+//! **USB HID Usage IDs** are a hardware-level standard that every keyboard
+//! speaks regardless of the OS.  By translating to HID at the *source* (capture)
+//! and back from HID at the *destination* (emulation), the network protocol is
+//! completely OS-agnostic.  The master captures a keystroke as `HidKeyCode::KeyA`
+//! (0x04) and every client knows exactly what to emulate.
+//!
+//! # Translation flow
+//!
+//! ```text
+//! Master keyboard
+//!   └─ Windows VK 0x41
+//!        └─ vk_to_hid()  →  HidKeyCode::KeyA (0x04)  ──── network ────
+//!
+//! Client (Linux)          Client (macOS)        Client (Windows)
+//!   └─ hid_to_keysym()      └─ hid_to_cgkeycode()  └─ hid_to_vk()
+//!        └─ XK_a (0x61)          └─ kVK_ANSI_A (0x00)    └─ VK_A (0x41)
+//! ```
+//!
+//! # Sub-modules
+//!
+//! - **`hid`**         – The [`HidKeyCode`] enum with all USB HID Usage IDs.
+//! - **`windows_vk`**  – VK ↔ HID table for Windows.
+//! - **`linux_x11`**   – HID → X11 KeySym table.
+//! - **`macos_cg`**    – HID → macOS CGKeyCode table.
 
 pub mod hid;
 pub mod linux_x11;
@@ -11,6 +51,9 @@ pub mod windows_vk;
 pub use hid::HidKeyCode;
 
 /// Unified key mapper providing all translation directions.
+///
+/// All methods are static (no instance needed).  Call them as
+/// `KeyMapper::windows_vk_to_hid(vk_code)` etc.
 pub struct KeyMapper;
 
 impl KeyMapper {

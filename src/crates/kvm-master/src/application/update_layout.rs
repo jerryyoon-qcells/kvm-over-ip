@@ -1,4 +1,19 @@
 //! UpdateLayoutUseCase: applies layout changes and persists configuration.
+//!
+//! The main entry point is [`build_layout`], which converts a list of
+//! [`ClientLayoutConfig`] structs (typically loaded from TOML or sent from the
+//! UI drag-and-drop editor) into a validated [`VirtualLayout`] with adjacencies
+//! automatically detected from touching screen edges.
+//!
+//! # Automatic adjacency detection (for beginners)
+//!
+//! When the user drags a client screen directly to the right of the master in
+//! the layout editor, the two screens share an edge (master's right == client's
+//! left).  The [`detect_and_add_adjacencies`] function scans all screen pairs
+//! and calls `layout.set_adjacency()` for each touching edge pair.
+//!
+//! This saves the user from having to manually configure adjacencies: just
+//! position screens correctly and the connections are inferred automatically.
 
 use kvm_core::{
     domain::layout::{Adjacency, ClientId, ClientScreen, LayoutError, ScreenRegion, VirtualLayout},
@@ -136,7 +151,23 @@ fn detect_and_add_adjacencies(layout: &mut VirtualLayout) {
     }
 }
 
+/// Returns `true` if the two 1-D intervals `[a_start, a_end)` and `[b_start, b_end)` overlap.
+///
+/// This is used to check whether two screen edges share any vertical (or horizontal)
+/// extent.  Two screens are considered adjacent only if their touching edges
+/// actually overlap — a screen that merely shares a corner point is not adjacent.
+///
+/// # Example
+///
+/// ```
+/// // Screens A (y: 0..1080) and B (y: 0..1080) share the full height: overlap.
+/// // Screens A (y: 0..1080) and C (y: 1080..2160) are adjacent but don't overlap.
+/// ```
 fn ranges_overlap(a_start: i32, a_end: i32, b_start: i32, b_end: i32) -> bool {
+    // Two intervals overlap when neither is entirely before the other.
+    // (a_start < b_end) means A starts before B ends.
+    // (b_start < a_end) means B starts before A ends.
+    // Both conditions together mean the intervals intersect.
     a_start < b_end && b_start < a_end
 }
 

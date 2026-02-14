@@ -4,12 +4,47 @@
 //! `CGDisplayBounds` to obtain each display's position and size in the
 //! global coordinate space.
 //!
-//! # Implementation notes
+//! # How Core Graphics display enumeration works (for beginners)
 //!
-//! The Core Graphics coordinate origin is at the bottom-left of the primary
-//! display.  We convert to a top-left origin by flipping the Y axis relative
-//! to the main display height so that coordinates are consistent with the
-//! Windows and Linux conventions used in the protocol.
+//! Core Graphics (part of the `CoreGraphics` framework, linked via the
+//! `core-graphics` crate) provides functions to query the display hardware:
+//!
+//! - `CGDisplay::active_displays()` — returns a list of `CGDirectDisplayID`
+//!   values (opaque u32 handles) for every active display.
+//! - `CGDisplayBounds(display_id)` — returns a `CGRect` with the display's
+//!   position (`origin`) and size (`size`) in the *global coordinate space*.
+//! - `CGDisplay::main()` — returns the primary display (the one with the menu
+//!   bar in macOS).
+//!
+//! # Y-axis flip
+//!
+//! The Core Graphics coordinate system places the origin at the **bottom-left**
+//! of the primary display, with Y increasing upward.  This is the opposite of
+//! the convention used in the KVM protocol (and Windows/Linux), which places the
+//! origin at the **top-left** with Y increasing downward.
+//!
+//! To convert from macOS coordinates to the protocol's top-left convention we
+//! apply the following formula for each display:
+//!
+//! ```text
+//! protocol_y = primary_height - cg_origin_y - display_height
+//! ```
+//!
+//! For the primary display itself (origin.y = 0), this gives:
+//! ```text
+//! protocol_y = primary_height - 0 - primary_height = 0  ✓
+//! ```
+//!
+//! For a display positioned directly below the primary (origin.y = -secondary_height):
+//! ```text
+//! protocol_y = primary_height - (-secondary_height) - secondary_height = primary_height  ✓
+//! ```
+//!
+//! # Primary display first
+//!
+//! The protocol requires the primary monitor to be at index 0.  After
+//! collecting all displays we sort by `is_primary` (descending) so that the
+//! primary display comes first, then reassign sequential `monitor_id` values.
 
 use super::{PlatformScreenEnumerator, ScreenInfoError};
 use kvm_core::protocol::messages::MonitorInfo;
@@ -46,6 +81,7 @@ impl PlatformScreenEnumerator for MacosScreenEnumerator {
 fn enumerate_via_core_graphics() -> Result<Vec<MonitorInfo>, ScreenInfoError> {
     use core_graphics::display::{CGDisplay, CGDisplayBounds};
 
+    // Get the list of all currently active (powered-on) display IDs.
     let active_displays =
         CGDisplay::active_displays().map_err(|e| ScreenInfoError::PlatformError(e.to_string()))?;
 
@@ -56,6 +92,7 @@ fn enumerate_via_core_graphics() -> Result<Vec<MonitorInfo>, ScreenInfoError> {
     }
 
     // Determine the primary display height for Y-axis flip.
+    // CGMainDisplayID() returns the display with the menu bar.
     let primary_id = CGDisplay::main().id;
     let primary_bounds = CGDisplayBounds(primary_id);
     let primary_height = primary_bounds.size.height as i32;
@@ -68,7 +105,8 @@ fn enumerate_via_core_graphics() -> Result<Vec<MonitorInfo>, ScreenInfoError> {
             let width = bounds.size.width as u32;
             let height = bounds.size.height as u32;
             let x_offset = bounds.origin.x as i32;
-            // Flip Y from bottom-left to top-left origin.
+            // Flip Y from Core Graphics' bottom-left origin to the protocol's top-left origin.
+            // See module-level doc for the derivation.
             let y_offset = primary_height - (bounds.origin.y as i32) - (height as i32);
 
             MonitorInfo {
@@ -77,16 +115,18 @@ fn enumerate_via_core_graphics() -> Result<Vec<MonitorInfo>, ScreenInfoError> {
                 height,
                 x_offset,
                 y_offset,
-                scale_factor: 100, // Retina scaling handled at higher level
+                scale_factor: 100, // Retina (HiDPI) scaling is handled at a higher level
                 is_primary: display_id == primary_id,
             }
         })
         .collect();
 
-    // Ensure primary is first.
+    // Ensure primary display is at index 0.
+    // `!m.is_primary` maps primary → false (0) and non-primary → true (1),
+    // so sort ascending puts primary first.
     monitors.sort_by_key(|m| !m.is_primary);
 
-    // Reassign sequential monitor_ids after sorting.
+    // Reassign sequential monitor_ids after sorting so primary is always id=0.
     for (i, m) in monitors.iter_mut().enumerate() {
         m.monitor_id = i as u8;
     }

@@ -4,6 +4,33 @@
 //! - Windows:  `%APPDATA%\KVMOverIP\config.toml`
 //! - Linux:    `~/.config/kvmoverip/config.toml`
 //! - macOS:    `~/Library/Application Support/KVMOverIP/config.toml`
+//!
+//! # What is TOML? (for beginners)
+//!
+//! TOML (Tom's Obvious Minimal Language) is a configuration file format designed
+//! to be easy to read and write.  It looks similar to INI files but with more
+//! data types.  Example:
+//!
+//! ```toml
+//! [network]
+//! control_port = 24800
+//! bind_address = "0.0.0.0"
+//!
+//! [master]
+//! disable_hotkey = "ScrollLock+ScrollLock"
+//! autostart = true
+//! ```
+//!
+//! The `serde` library provides automatic serialisation/deserialisation between
+//! Rust structs and TOML text.  The `#[derive(Serialize, Deserialize)]` macros
+//! generate all the boilerplate code at compile time.
+//!
+//! # Serde default values
+//!
+//! Fields annotated with `#[serde(default = "some_fn")]` use the return value
+//! of `some_fn()` when the field is absent from the TOML file.  This allows
+//! the app to work correctly on first run (before a config file exists) and
+//! when upgrading from an older config file that is missing newer fields.
 
 use std::path::PathBuf;
 

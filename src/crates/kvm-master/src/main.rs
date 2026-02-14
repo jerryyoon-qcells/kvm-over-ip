@@ -14,6 +14,26 @@
 //!       ├─ DiscoveryResponder  (UDP background thread)
 //!       └─ RouteInputUseCase   (Tokio task)
 //! ```
+//!
+//! # What is Tokio? (for beginners)
+//!
+//! Tokio is an asynchronous runtime for Rust.  It allows the program to handle
+//! many concurrent operations (network I/O, timers, channels) without creating
+//! one OS thread per operation.
+//!
+//! The `#[tokio::main]` attribute transforms the `main` function into a Tokio
+//! entry point that sets up a thread pool and runs the async task scheduler.
+//!
+//! Within this runtime, `tokio::spawn(async move { ... })` creates a new
+//! lightweight task (much cheaper than a thread) that runs concurrently with
+//! other tasks.  `await` suspends a task while waiting for I/O without
+//! blocking the underlying OS thread.
+//!
+//! # Shutdown mechanism
+//!
+//! A shared `Arc<AtomicBool>` named `running` is set to `false` when Ctrl-C
+//! is received.  All background services poll this flag and exit their loops
+//! when it becomes `false`.  This ensures a clean shutdown without `SIGKILL`.
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},

@@ -8,6 +8,38 @@
 //! - Inbound messages are decoded and forwarded on an `mpsc` channel.
 //! - Outbound messages (e.g. `ScreenInfo`, `Ping`) are sent through the
 //!   connection.
+//!
+//! # Connection lifecycle (for beginners)
+//!
+//! ```text
+//! ClientConnection::start()
+//!   ├─ Try to connect to master_addr via TCP
+//!   │    └─ if failed: wait reconnect_interval, retry forever
+//!   ├─ On success: emit NetworkEvent::Connected
+//!   ├─ Start read_loop (background Tokio task)
+//!   │    ├─ Read bytes from TCP stream
+//!   │    ├─ Accumulate in a buffer until a complete message is available
+//!   │    ├─ Call decode_message() to parse the header + payload
+//!   │    └─ Emit NetworkEvent::MessageReceived(msg)
+//!   └─ Return the mpsc receiver to the caller
+//! ```
+//!
+//! # Message framing
+//!
+//! TCP is a *stream* protocol — bytes arrive in order but not necessarily in
+//! the same chunks they were sent.  One `send()` on the master does not
+//! guarantee one `recv()` on the client; the OS may merge or split packets.
+//!
+//! The KVM protocol handles this with an explicit 24-byte header that includes
+//! the `payload_length` field.  The read loop:
+//!
+//! 1. Reads bytes until the buffer contains at least 24 bytes (the header).
+//! 2. Reads the `payload_length` field to know how many more bytes to wait for.
+//! 3. When `buffer.len() >= 24 + payload_length`, calls `decode_message()`.
+//! 4. Advances the buffer by the consumed byte count and repeats.
+//!
+//! This process is called "message framing" and it is a standard pattern for
+//! binary TCP protocols.
 
 use std::net::SocketAddr;
 use std::sync::Arc;

@@ -8,6 +8,25 @@
 //!
 //! This module uses `unsafe` code exclusively for Windows API FFI calls.
 //! All `unsafe` blocks are annotated with `// SAFETY:` comments.
+//!
+//! # Scroll Event Notes for Beginners
+//!
+//! Windows has two different sets of mouse-wheel constants that are easy to
+//! confuse:
+//!
+//! 1. **`MOUSEEVENTF_WHEEL` / `MOUSEEVENTF_HWHEEL`** — these are *flag bits*
+//!    used in `SendInput()` / `mouse_event()` to *synthesize* scroll events.
+//!    Their numeric values are `0x0800` and `0x1000`.
+//!
+//! 2. **`WM_MOUSEWHEEL` / `WM_MOUSEHWHEEL`** — these are *window message IDs*
+//!    delivered by the operating system when the user physically rotates the
+//!    scroll wheel.  Their numeric values are `0x020A` and `0x020E`.
+//!
+//! A `WH_MOUSE_LL` low-level hook receives the *window message ID* in the
+//! `wParam` argument, so the correct constants to match against are
+//! `WM_MOUSEWHEEL` and `WM_MOUSEHWHEEL`.  Using the `MOUSEEVENTF_*` constants
+//! here would cause scroll events to be silently ignored because the values
+//! do not match the actual `wParam` integers.
 
 #![cfg(target_os = "windows")]
 
@@ -17,25 +36,40 @@ use std::sync::OnceLock;
 use std::thread;
 
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    MOUSEEVENTF_HWHEEL, MOUSEEVENTF_WHEEL,
-};
+// NOTE: We deliberately do NOT import MOUSEEVENTF_WHEEL / MOUSEEVENTF_HWHEEL here.
+// Those constants are for SendInput() output, not for WH_MOUSE_LL input matching.
+// See module-level docs above for a full explanation.
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
     HC_ACTION, HHOOK, KBDLLHOOKSTRUCT, KBDLLHOOKSTRUCT_FLAGS, LLKHF_EXTENDED, MSG,
     MSLLHOOKSTRUCT, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN,
-    WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE, WM_RBUTTONDOWN, WM_RBUTTONUP,
-    WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP, XBUTTON1, XBUTTON2,
+    WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSEMOVE, WM_MOUSEWHEEL,
+    WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP,
+    // XBUTTON1 distinguishes the X1 side button from X2 in WM_XBUTTONDOWN/UP events.
+    // XBUTTON2 is not used explicitly: any mouseData value that is not XBUTTON1 is
+    // treated as X2 by the fallback branch in the match below.
+    XBUTTON1,
 };
 
 use super::{CaptureError, InputSource, MouseButton, RawInputEvent};
 
 /// Atomic flag: when `true`, the current hook event should be suppressed
 /// (not forwarded to the local system).
+///
+/// This flag is set from the Tokio async thread via `suppress_current_event()`
+/// and read inside the hook callback on the hook-loop thread.  Using an
+/// `AtomicBool` (rather than a `Mutex<bool>`) avoids any blocking in the
+/// time-critical hook callback.
 static SUPPRESS_FLAG: AtomicBool = AtomicBool::new(false);
 
 /// Global sender used by hook callbacks to deliver events to the async runtime.
 /// Initialized once by [`WindowsInputCaptureService::start`].
+///
+/// `OnceLock` is a cell that can be written exactly once and read many times.
+/// The hook callbacks are `unsafe extern "system"` functions that receive no
+/// user data pointer, so the only way to pass the sender into them is via a
+/// global.  `OnceLock` makes this safe: the write is guarded against double
+/// initialisation and the read side is always valid after the first write.
 static EVENT_SENDER: OnceLock<Sender<RawInputEvent>> = OnceLock::new();
 
 /// Windows low-level input capture service.
@@ -252,14 +286,29 @@ unsafe extern "system" fn mouse_hook_proc(
             };
             RawInputEvent::MouseButtonUp { button, x, y, time_ms }
         }
-        msg if msg == MOUSEEVENTF_WHEEL.0 => {
-            let delta = ((mhs.mouseData >> 16) as i16);
+
+        // FIX (Bug 1): The original code matched against MOUSEEVENTF_WHEEL.0 (= 0x0800)
+        // and MOUSEEVENTF_HWHEEL.0 (= 0x1000).  Those are flag bits for SendInput() and
+        // will NEVER appear as wParam in a WH_MOUSE_LL callback.  The correct message IDs
+        // that Windows actually delivers to a low-level mouse hook are:
+        //   WM_MOUSEWHEEL  = 0x020A  (vertical wheel)
+        //   WM_MOUSEHWHEEL = 0x020E  (horizontal wheel / tilt)
+        //
+        // How the scroll delta works:
+        //   MSLLHOOKSTRUCT.mouseData is a DWORD.  Its high 16 bits carry the signed
+        //   scroll amount (WHEEL_DELTA units: +120 = one notch up, -120 = one notch down).
+        //   We shift right by 16 and reinterpret as i16 to recover the signed value.
+        WM_MOUSEWHEEL => {
+            // Vertical scroll: positive delta = away from user (up/zoom-in convention).
+            let delta = (mhs.mouseData >> 16) as i16;
             RawInputEvent::MouseWheel { delta, x, y, time_ms }
         }
-        msg if msg == MOUSEEVENTF_HWHEEL.0 => {
-            let delta = ((mhs.mouseData >> 16) as i16);
+        WM_MOUSEHWHEEL => {
+            // Horizontal scroll (wheel tilt): positive delta = right.
+            let delta = (mhs.mouseData >> 16) as i16;
             RawInputEvent::MouseWheelH { delta, x, y, time_ms }
         }
+
         _ => {
             return CallNextHookEx(None, n_code, w_param, l_param);
         }

@@ -3,6 +3,42 @@
 //! All `#[tauri::command]` functions live here and delegate to the shared
 //! [`AppState`].  The Presentation layer (Tauri + React) is the only consumer
 //! of this module; it must NOT be imported by the Application or Domain layers.
+//!
+//! # How Tauri commands work (for beginners)
+//!
+//! Tauri is a framework for building native desktop applications using a web
+//! frontend (React/HTML/JS) and a Rust backend.
+//!
+//! The React frontend calls Rust functions using:
+//! ```js
+//! const result = await invoke("get_clients");
+//! ```
+//!
+//! Tauri routes `"get_clients"` to the `#[tauri::command] fn get_clients(...)`.
+//! The function receives the `AppState` via dependency injection and returns
+//! a value that Tauri serialises to JSON for the frontend.
+//!
+//! # Data Transfer Objects (DTOs)
+//!
+//! The Rust backend uses internal types (e.g., `ClientRuntimeState`, `Uuid`)
+//! that are not directly serialisable to JSON.  DTOs are simple structs
+//! (`ClientDto`, `ClientLayoutDto`) that:
+//!
+//! - Contain only JSON-serialisable fields (`String`, `f32`, `u32`, etc.)
+//! - Are defined using `#[derive(Serialize, Deserialize)]` so Tauri can
+//!   automatically convert them to/from JSON.
+//! - Mirror the TypeScript interfaces in `src/packages/ui-master/src/types.ts`.
+//!
+//! Any change to a DTO struct here must be reflected in the corresponding
+//! TypeScript interface to avoid runtime type mismatches.
+//!
+//! # `CommandResult<T>` wrapper
+//!
+//! All Tauri commands return `CommandResult<T>` rather than `Result<T, E>`.
+//! This ensures every command response has the same shape:
+//! `{ success: bool, data: T | null, error: string | null }`.
+//! The frontend can always safely access `result.success` without a
+//! try/catch block around the `invoke` call.
 
 use std::sync::Arc;
 
@@ -22,9 +58,27 @@ use kvm_core::ClientId;
 // ── Shared application state ──────────────────────────────────────────────────
 
 /// Application state shared between Tauri commands via `tauri::State`.
+///
+/// This struct is wrapped in `Arc<>` and registered with Tauri's state
+/// management system.  Tauri injects it into every command handler function
+/// as a parameter of type `tauri::State<Arc<AppState>>`.
+///
+/// All fields are `Mutex<...>` (async Tokio mutex) because Tauri commands run
+/// in an async Tokio context and the mutex allows safe concurrent access from
+/// multiple simultaneous command invocations.
+///
+/// # Why async Mutex (not std::sync::Mutex)?
+///
+/// `std::sync::Mutex` blocks the OS thread while waiting to acquire the lock.
+/// In an async context this is problematic because blocking a thread prevents
+/// other async tasks from running.  `tokio::sync::Mutex` suspends the async
+/// task instead of blocking the thread, allowing other tasks to proceed.
 pub struct AppState {
+    /// The in-memory registry of all known client machines.
     pub client_registry: Mutex<ClientRegistry>,
+    /// Manages TCP connections and the pairing state machine.
     pub connection_manager: Mutex<ConnectionManager>,
+    /// The current application configuration (network ports, layout, etc.).
     pub config: Mutex<AppConfig>,
 }
 

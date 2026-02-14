@@ -3,6 +3,27 @@
 //! This use case sits at the application layer and delegates to a
 //! [`PlatformInputEmulator`] trait object for OS-level event injection.
 //! The platform-specific implementations are in the infrastructure layer.
+//!
+//! # Data flow (for beginners)
+//!
+//! ```text
+//! Network (TCP)
+//!   └─ KvmMessage::KeyEvent { key_code: HidKeyCode::KeyA, ... }
+//!        └─ EmulateInputUseCase::handle_key_event()
+//!             ├─ Validate: HidKeyCode::Unknown → skip (return Ok)
+//!             ├─ DedupFilter: skip if same key already pressed (anti-echo)
+//!             └─ PlatformInputEmulator::emit_key_down(HidKeyCode::KeyA, modifiers)
+//!                  └─ WindowsInputEmulator → SendInput(VK_A)
+//!                     LinuxXTestEmulator   → XTestFakeKeyEvent(XK_a)
+//!                     MacosInputEmulator   → CGEventPost(kVK_ANSI_A)
+//! ```
+//!
+//! # DedupFilter
+//!
+//! Network jitter can sometimes deliver the same event twice.  The `DedupFilter`
+//! remembers the last mouse position and skips duplicate consecutive
+//! `MouseMove` events.  This prevents cursor micro-jitter that would otherwise
+//! appear as tiny random movements on the client screen.
 
 use kvm_core::{
     keymap::hid::HidKeyCode,

@@ -2,6 +2,25 @@
 //!
 //! Reference: Windows Virtual-Key Codes (winuser.h) and USB HID Usage Tables 1.3.
 //! Windows VK codes range from 0x00 to 0xFF.
+//!
+//! # What is a Windows Virtual Key (VK) code? (for beginners)
+//!
+//! Windows assigns each keyboard key a number called a "Virtual Key code".
+//! These are defined in `<winuser.h>` and named `VK_*` (e.g., `VK_RETURN = 0x0D`,
+//! `VK_SPACE = 0x20`).  They are "virtual" because they represent *logical* keys
+//! rather than physical scan codes: pressing the letter A on any keyboard layout
+//! always produces `VK_A = 0x41`, regardless of whether the physical key is
+//! labelled "A" (QWERTY) or "Q" (AZERTY).
+//!
+//! # How this table works
+//!
+//! `VK_TO_HID_TABLE` is a compile-time constant array of 256 [`HidKeyCode`]
+//! values, indexed by VK code.  Position 0x41 holds `HidKeyCode::KeyA` because
+//! Windows VK_A is 0x41.  Any VK code without a HID equivalent stores
+//! `HidKeyCode::Unknown`.
+//!
+//! Indexing into this array is an O(1) lookup — the fastest possible operation.
+//! This is important because every captured key event goes through this table.
 
 use super::hid::HidKeyCode;
 

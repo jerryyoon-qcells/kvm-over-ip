@@ -11,6 +11,30 @@
 //!
 //! The responder runs as a blocking task on a dedicated thread to avoid
 //! blocking the Tokio runtime with synchronous socket I/O.
+//!
+//! # How UDP discovery works (for beginners)
+//!
+//! UDP (User Datagram Protocol) is a lightweight, connectionless networking
+//! protocol.  Unlike TCP it does not guarantee delivery, ordering, or duplicate
+//! prevention.  These trade-offs make it ideal for discovery broadcasts:
+//!
+//! 1. The client sends a UDP packet to the LAN broadcast address (e.g.,
+//!    `255.255.255.255`) on the discovery port.  Every device on the LAN
+//!    receives this packet.
+//!
+//! 2. The master is listening on that port.  It parses the `AnnounceMessage`
+//!    inside the packet and sends a unicast `AnnounceResponse` back to the
+//!    sender's IP address.
+//!
+//! 3. The client receives the response and knows the master's IP + control port.
+//!    It can now establish a TCP connection to begin the pairing handshake.
+//!
+//! # Read timeout
+//!
+//! The socket is configured with a 1-second read timeout.  This means the
+//! `recv_from` call blocks for at most 1 second before returning a timeout
+//! error.  On each timeout we check the `running` flag; if the application
+//! is shutting down we exit the loop cleanly.
 
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::{

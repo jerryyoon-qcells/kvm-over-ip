@@ -5,6 +5,35 @@
 //! to/from HID at the capture and emulation boundaries.
 //!
 //! Reference: USB HID Usage Tables 1.3, Section 10 (Keyboard/Keypad page 0x07).
+//!
+//! # What is a HID Usage ID? (for beginners)
+//!
+//! The **USB Human Interface Device (HID)** standard assigns a unique number to
+//! every key on a keyboard.  These numbers are called *Usage IDs* and they are
+//! grouped by *Usage Page*.  All keyboard keys are on page 0x07 ("Keyboard/Keypad").
+//!
+//! For example:
+//!
+//! | Key          | HID Usage ID |
+//! |--------------|-------------|
+//! | Letter A     | 0x04        |
+//! | Letter B     | 0x05        |
+//! | Enter        | 0x28        |
+//! | Left Ctrl    | 0xE0        |
+//!
+//! Notice that HID codes for letters start at 0x04 (not at 'A'=0x41 like ASCII).
+//! The reason is that HID codes represent **physical key positions**, not
+//! characters.  The character that a key produces depends on the current keyboard
+//! layout (QWERTY, AZERTY, Dvorak, etc.) and the modifier keys held down.
+//! By using position codes, the system works correctly for all keyboard layouts.
+//!
+//! # The `Unknown` sentinel
+//!
+//! Not every key has a universally assigned HID code (e.g., some multimedia
+//! keys are vendor-specific).  [`HidKeyCode::Unknown`] (value 0x0000) is used
+//! as a placeholder for any key that has no standard mapping.  The encoder
+//! will still transmit the event with code 0x0000 so the receiver can decide
+//! what to do with it.
 
 use serde::{Deserialize, Serialize};
 

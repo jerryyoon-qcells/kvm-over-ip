@@ -1,3 +1,31 @@
+/**
+ * Tests for the `StatusDisplay` component.
+ *
+ * # What these tests verify
+ *
+ * - The three render states (loading, unavailable, normal) are all handled.
+ * - Each status field (connection state, master address, client name, monitors)
+ *   is rendered with the correct value.
+ * - The "Discovering…" fallback appears when master address is empty.
+ * - Error messages appear only when `lastError` is set.
+ *
+ * # How store state is injected
+ *
+ * `StatusDisplay` reads directly from the Zustand store — it has no props
+ * for data.  Tests use `useClientStore.setState(...)` to inject specific store
+ * state before rendering.  This is the recommended pattern for testing
+ * components that use Zustand.
+ *
+ * # `makeStatus` helper
+ *
+ * The helper function builds a complete `ClientStatusDto` with defaults and
+ * accepts a `Partial<ClientStatusDto>` for overrides.  This keeps individual
+ * tests concise — a test only needs to specify the field it cares about:
+ * ```ts
+ * makeStatus({ masterAddress: "10.0.0.5" })
+ * ```
+ */
+
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -5,10 +33,19 @@ import { StatusDisplay } from "../components/StatusDisplay";
 import { useClientStore } from "../store";
 import type { ClientStatusDto } from "../types";
 
+// ── Test isolation ─────────────────────────────────────────────────────────────
+
+// Reset relevant store slices after each test
 afterEach(() => {
   useClientStore.setState({ status: null, isLoading: false, lastError: null });
 });
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/**
+ * Creates a `ClientStatusDto` with sensible defaults.
+ * Pass overrides for only the fields your test cares about.
+ */
 const makeStatus = (overrides: Partial<ClientStatusDto> = {}): ClientStatusDto => ({
   connectionStatus: "Active",
   masterAddress: "192.168.1.10",
@@ -17,20 +54,22 @@ const makeStatus = (overrides: Partial<ClientStatusDto> = {}): ClientStatusDto =
   ...overrides,
 });
 
+// ── Tests ──────────────────────────────────────────────────────────────────────
+
 describe("StatusDisplay", () => {
   test("shows loading message when loading and no status available", () => {
-    // Arrange
+    // Arrange — simulate the first fetch being in-flight
     useClientStore.setState({ isLoading: true, status: null });
 
     // Act
     render(<StatusDisplay />);
 
-    // Assert
+    // Assert — loading indicator is visible
     expect(screen.getByRole("status")).toHaveTextContent(/loading/i);
   });
 
   test("shows unavailable message when status is null and not loading", () => {
-    // Arrange
+    // Arrange — simulate a failed initial fetch (loading done, no data)
     useClientStore.setState({ status: null, isLoading: false });
 
     // Act
@@ -63,13 +102,13 @@ describe("StatusDisplay", () => {
   });
 
   test("shows Discovering when master address is empty", () => {
-    // Arrange
+    // Arrange — empty string means auto-discovery mode is active
     useClientStore.setState({ status: makeStatus({ masterAddress: "" }) });
 
     // Act
     render(<StatusDisplay />);
 
-    // Assert
+    // Assert — component shows "Discovering…" fallback
     expect(screen.getByTestId("status-master-address")).toHaveTextContent("Discovering…");
   });
 
@@ -102,7 +141,7 @@ describe("StatusDisplay", () => {
     // Act
     render(<StatusDisplay />);
 
-    // Assert
+    // Assert — the error element must not be in the document at all
     expect(screen.queryByTestId("status-error")).not.toBeInTheDocument();
   });
 

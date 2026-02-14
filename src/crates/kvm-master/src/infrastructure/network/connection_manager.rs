@@ -1,4 +1,28 @@
 //! ConnectionManager: manages TLS control channel connections, pairing, and the client registry.
+//!
+//! # Responsibilities (for beginners)
+//!
+//! The `ConnectionManager` owns:
+//!
+//! - **Active pairing sessions** – A pairing session is created when a new client
+//!   connects and needs to prove it is authorised.  The master shows a 6-digit PIN
+//!   and waits for the client to submit a hash of (PIN + session UUID).
+//!
+//! - **Lockout tracking** – If a client submits the wrong PIN more than a configured
+//!   number of times, it is locked out for a period.  This prevents brute-force
+//!   PIN guessing.
+//!
+//! - **Session tokens** – After pairing succeeds, a 32-byte random token is issued.
+//!   The client must present this token when opening the secondary (input) channel.
+//!
+//! # Security note on PIN hashing
+//!
+//! The PIN is never sent over the network in plaintext.  Instead, the client
+//! sends `SHA-256(PIN || session_id)` where `||` is concatenation.  The
+//! `session_id` is a random UUID that changes for every pairing attempt, so
+//! an attacker cannot reuse a captured response for a different session.
+//! This is a simplified challenge-response scheme (not full PAKE, but
+//! sufficient for a trusted local network).
 
 use std::collections::HashMap;
 use std::net::SocketAddr;

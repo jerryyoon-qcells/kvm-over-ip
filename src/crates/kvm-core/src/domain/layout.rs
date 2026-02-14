@@ -3,15 +3,70 @@
 //! The layout engine maintains a unified 2D coordinate space ("virtual screen space")
 //! where all screens are positioned. The master screen is anchored at (0, 0).
 //! Clients are positioned relative to the master using their virtual_x / virtual_y offsets.
+//!
+//! # What is "virtual screen space"? (for beginners)
+//!
+//! Imagine laying all of your monitors flat on a table, positioned exactly as they
+//! appear on your desk.  The "virtual screen" is that imaginary table surface.
+//!
+//! In this coordinate system:
+//!
+//! - The **master screen** always occupies the rectangle `(0, 0)` to
+//!   `(master_width, master_height)`.
+//! - Client screens can be placed anywhere around the master — to the right
+//!   (positive X), to the left (negative X), above (negative Y), or below
+//!   (positive Y).
+//!
+//! Example layout (master 1920×1080, client to the right):
+//!
+//! ```text
+//! +------------------+------------------+
+//! | Master           | Client           |
+//! | (0,0)–(1920,1080)|(1920,0)–(3840,1080)
+//! +------------------+------------------+
+//! ```
+//!
+//! When the cursor reaches the right edge of the master screen, the routing
+//! engine sees that an [`Adjacency`] connects that edge to the left edge of the
+//! client, and seamlessly switches control to the client.
+//!
+//! # Edge transitions
+//!
+//! An [`Adjacency`] defines which edge of one screen connects to which edge of
+//! another.  Only opposite edges are valid (Left↔Right, Top↔Bottom).
+//!
+//! The [`VirtualLayout::check_edge_transition`] method is called on every mouse
+//! move event while the cursor is on the master.  When the cursor gets within
+//! [`EDGE_THRESHOLD`] pixels of a configured edge, it returns an
+//! [`EdgeTransition`] that tells the caller:
+//!
+//! 1. Which screen to switch to.
+//! 2. Where on that screen the cursor should appear (proportionally mapped).
+//! 3. Where to teleport the physical master cursor so that further movement
+//!    continues flowing towards the client.
 
 use std::collections::HashMap;
 use thiserror::Error;
 use uuid::Uuid;
 
 /// Pixel threshold within which a cursor is considered to be "at the edge".
+///
+/// When the cursor is within this many pixels of a screen edge that has an
+/// adjacency configured, an edge transition is triggered.  A value of 2 means
+/// the last two pixel columns/rows of the screen are the "hot zone".
+///
+/// Why 2 and not 1?  A threshold of 1 sometimes causes the cursor to "bounce"
+/// back before the OS delivers the transition event because the hook fires when
+/// the cursor is at the very last pixel and the next update has already moved
+/// it back slightly.  Two pixels gives the hook enough margin.
 const EDGE_THRESHOLD: i32 = 2;
 
 /// Unique identifier for a client, derived from UUID v4.
+///
+/// A UUID (Universally Unique Identifier) is a 128-bit number guaranteed to be
+/// unique across all machines and time without coordination.  UUID v4 is
+/// randomly generated.  We use it as the client ID so the master can recognise
+/// the same client even if its IP address changes between connections.
 pub type ClientId = Uuid;
 
 /// Identifies a screen (either master or a specific client).
@@ -364,7 +419,12 @@ impl VirtualLayout {
 
             let to_region = self.get_region(&adj.to_screen)?;
 
-            // Map the perpendicular cursor coordinate proportionally to the target edge
+            // Map the perpendicular cursor coordinate proportionally to the target edge.
+            //
+            // "Proportional mapping" means: if the cursor is 30% of the way down
+            // the source screen's height when it crosses the right edge, it should
+            // appear 30% of the way down the destination screen's height.
+            // This feels natural even when the two screens have different resolutions.
             let (entry_x, entry_y) = match (&adj.from_edge, &adj.to_edge) {
                 (Edge::Right, Edge::Left) | (Edge::Left, Edge::Right) => {
                     let t = local_y as f64 / from_region.height as f64;
@@ -389,12 +449,22 @@ impl VirtualLayout {
                 _ => continue, // already validated as incompatible, skip
             };
 
-            // Determine where to teleport the master physical cursor
+            // Determine where to teleport the master physical cursor.
+            //
+            // After the transition the master cursor is still physically on the
+            // master screen.  If we leave it at the edge it will immediately
+            // trigger another transition event the next time the user moves the
+            // mouse.  To prevent that, we teleport it to a position near the
+            // *opposite* edge — just a few pixels away from the boundary.
+            //
+            // The exact values below place the cursor at x=1 (or y=1) from the
+            // edge closest to the transition side, so any subsequent movement
+            // must travel across the whole screen before it could trigger again.
             let (master_teleport_x, master_teleport_y) = match adj.from_edge {
-                Edge::Right => (1, local_y),
-                Edge::Left => (from_region.width as i32 - 2, local_y),
-                Edge::Bottom => (local_x, 1),
-                Edge::Top => (local_x, from_region.height as i32 - 2),
+                Edge::Right => (1, local_y),                           // teleport to left side
+                Edge::Left => (from_region.width as i32 - 2, local_y), // teleport to right side
+                Edge::Bottom => (local_x, 1),                          // teleport to top side
+                Edge::Top => (local_x, from_region.height as i32 - 2), // teleport to bottom side
             };
 
             return Some(EdgeTransition {

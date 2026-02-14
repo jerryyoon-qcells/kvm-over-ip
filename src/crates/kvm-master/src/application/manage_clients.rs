@@ -1,4 +1,27 @@
 //! ManageClientsUseCase: client registry and pairing state management.
+//!
+//! The `ClientRegistry` is the master's in-memory database of every KVM client
+//! it has discovered or previously connected to.  Each entry tracks:
+//!
+//! - The client's UUID, name, and current `ConnectionState`.
+//! - Performance metrics (latency, events per second) updated in real-time.
+//!
+//! # Connection lifecycle (for beginners)
+//!
+//! Clients progress through these states:
+//!
+//! ```text
+//! Discovered  ──►  Connecting  ──►  Pairing  ──►  Paired  ──►  Connected
+//!                                                                  │
+//!                                                           Disconnected
+//! ```
+//!
+//! - `Discovered`: the master received a UDP `AnnounceMessage` from this client.
+//! - `Connecting`: the master is establishing a TCP control channel.
+//! - `Pairing`: a PIN exchange is in progress.
+//! - `Paired`: PIN verified; the relationship is stored.
+//! - `Connected`: the TCP channel is open and input events are flowing.
+//! - `Disconnected`: the TCP channel closed; the entry is kept for reconnection.
 
 use std::collections::HashMap;
 use kvm_core::ClientId;
@@ -6,13 +29,24 @@ use uuid::Uuid;
 use crate::infrastructure::network::connection_manager::ConnectedClientInfo;
 
 /// Current state of a client connection.
+///
+/// This enum drives the UI colour coding in `ClientList.tsx`:
+/// - Green = `Connected` or `Paired`
+/// - Yellow = `Discovered`, `Connecting`, or `Pairing`
+/// - Grey = `Disconnected`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConnectionState {
+    /// UDP `Announce` received; no TCP connection yet.
     Discovered,
+    /// TCP handshake in progress.
     Connecting,
+    /// TCP channel open; input events flowing.
     Connected,
+    /// PIN exchange in progress.
     Pairing,
+    /// PIN exchange complete; relationship stored on disk.
     Paired,
+    /// TCP channel closed.
     Disconnected,
 }
 
@@ -27,6 +61,15 @@ pub struct ClientRuntimeState {
 }
 
 /// In-memory registry of all known clients.
+///
+/// The registry is stored behind a `Mutex` in `AppState` so it can be shared
+/// between the Tokio async tasks (discovery pump, Tauri commands).
+///
+/// # HashMap choice
+///
+/// A `HashMap<ClientId, ClientRuntimeState>` provides O(1) lookup by UUID.
+/// Iteration order is not guaranteed but that is fine — the UI sorts the
+/// list alphabetically before displaying it.
 #[derive(Default)]
 pub struct ClientRegistry {
     clients: HashMap<ClientId, ClientRuntimeState>,

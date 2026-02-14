@@ -3,6 +3,32 @@
 //! Translates HID Usage IDs to Windows Virtual Key codes and injects
 //! events using SendInput. Mouse coordinates are normalized to the
 //! Windows virtual screen space [0, 65535].
+//!
+//! # What is SendInput? (for beginners)
+//!
+//! `SendInput` is a Windows API function that synthesises keyboard and mouse
+//! input as if the user had physically pressed keys or moved the mouse.
+//! The input is processed by the focused application exactly like real input.
+//!
+//! # Mouse coordinate normalisation
+//!
+//! Windows `SendInput` with `MOUSEEVENTF_ABSOLUTE` expects coordinates in the
+//! range 0–65535, where (0, 0) is the top-left of the virtual screen and
+//! (65535, 65535) is the bottom-right.  "Virtual screen" means the bounding
+//! rectangle of all monitors combined.
+//!
+//! The `normalize_coords` helper converts pixel coordinates (0 to screen_width)
+//! into the 0–65535 range using the formula:
+//!
+//! ```text
+//! normalised_x = pixel_x * 65535 / virtual_screen_width
+//! ```
+//!
+//! # Extended key flag
+//!
+//! Some keys (Right Ctrl, Right Alt, Delete, Insert, Home, End, and the
+//! numeric-keypad keys) require the `KEYEVENTF_EXTENDEDKEY` flag to be set.
+//! Without it, Windows maps these keys to their left-side or numpad equivalents.
 
 #![cfg(target_os = "windows")]
 

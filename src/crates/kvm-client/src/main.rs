@@ -14,6 +14,25 @@
 //!       ├─ ScreenInfoAck                -> re-enumerate monitors
 //!       └─ Disconnect                   -> reconnect
 //! ```
+//!
+//! # Message dispatch loop (for beginners)
+//!
+//! The `while let Some(event) = network_rx.recv().await` loop is the heart
+//! of the client.  It processes one network event at a time:
+//!
+//! - `NetworkEvent::Connected` – update the UI status to "Connected".
+//! - `NetworkEvent::Disconnected` – update status to "Disconnected";
+//!   the `ClientConnection` handles automatic reconnection.
+//! - `NetworkEvent::MessageReceived(msg)` – route the message to the
+//!   appropriate handler (key emulation, mouse emulation, etc.).
+//!
+//! # Platform input emulator
+//!
+//! The `MockInputEmulator` used here records all injected events rather than
+//! actually synthesising OS input.  In a production build it is replaced by:
+//! - `WindowsInputEmulator` (calls `SendInput` Win32 API)
+//! - `LinuxXTestEmulator`   (calls XTest extension)
+//! - `MacosInputEmulator`   (calls CoreGraphics framework)
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},

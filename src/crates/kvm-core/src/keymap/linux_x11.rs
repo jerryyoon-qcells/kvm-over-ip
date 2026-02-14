@@ -2,6 +2,32 @@
 //!
 //! X11 KeySym values are defined in X11/keysymdef.h.
 //! Reference: https://gitlab.freedesktop.org/xorg/proto/xorgproto/-/blob/master/include/X11/keysymdef.h
+//!
+//! # What is an X11 KeySym? (for beginners)
+//!
+//! X11 is the windowing system used on Linux (and other Unix-like systems).
+//! It uses a system called **KeySym** (Key Symbol) to identify keys.
+//!
+//! Unlike Windows VK codes (which identify physical key positions), X11 KeySyms
+//! can represent *characters* as well as physical keys.  For example:
+//!
+//! | KeySym name | Value  | Meaning        |
+//! |-------------|--------|----------------|
+//! | `XK_a`      | 0x0061 | lowercase 'a'  |
+//! | `XK_A`      | 0x0041 | uppercase 'A'  |
+//! | `XK_Return` | 0xFF0D | Enter key      |
+//! | `XK_Escape` | 0xFF1B | Escape key     |
+//!
+//! Notice that letters use their **ASCII values** (0x61 = 'a' in ASCII).
+//! The XTest extension (`XTestFakeKeyEvent`) accepts a KeySym and synthesises
+//! the appropriate key event on the X11 display.
+//!
+//! # Why lowercase letter KeySyms?
+//!
+//! This table maps letter keys to their *lowercase* KeySym (e.g., 0x0061 for 'a'
+//! rather than 0x0041 for 'A').  The XTest extension translates automatically
+//! when a Shift modifier is present, so we always pass the base (lowercase) form
+//! and let X11 apply the appropriate modifier state.
 
 use super::hid::HidKeyCode;
 

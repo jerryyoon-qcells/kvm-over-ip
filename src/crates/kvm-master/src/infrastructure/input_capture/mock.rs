@@ -2,6 +2,21 @@
 //!
 //! Allows tests to inject synthetic [`RawInputEvent`]s without requiring
 //! a running Windows message loop or OS hooks.
+//!
+//! # Design pattern: test double (for beginners)
+//!
+//! A "mock" (or "test double") is a replacement for a real component that is
+//! used only in tests.  Rather than installing actual Windows hooks — which
+//! would require running as a Windows process, having a message loop, etc. —
+//! test code can:
+//!
+//! 1. Create a `MockInputSource`.
+//! 2. Call `source.start()` to get the receiver channel.
+//! 3. Call `source.inject_event(...)` to push synthetic events.
+//! 4. Assert that the `RouteInputUseCase` processed the events correctly.
+//!
+//! This makes tests fast, deterministic, and portable (they run on any OS,
+//! including Linux CI runners).
 
 use std::sync::{
     mpsc::{self, Sender},

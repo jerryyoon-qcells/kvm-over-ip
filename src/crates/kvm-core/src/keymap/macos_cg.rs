@@ -3,6 +3,25 @@
 //! CGKeyCode values are defined in Carbon Events.h (HIToolbox framework).
 //! Reference: https://github.com/nicholasess/mac-keycode-list/blob/master/keycode.json
 //! and /System/Library/Frameworks/Carbon.framework/Versions/A/Frameworks/HIToolbox.framework/Headers/Events.h
+//!
+//! # What is a CGKeyCode? (for beginners)
+//!
+//! On macOS, keyboard events are synthesised using the **CoreGraphics** framework.
+//! `CGEventCreateKeyboardEvent` takes a `CGKeyCode` (a `u16`) to identify the key.
+//!
+//! CGKeyCodes are based on the **ANSI keyboard layout** — they represent physical
+//! key *positions* rather than characters.  That is why the codes for letters do
+//! not follow alphabetical order:
+//!
+//! | Key | CGKeyCode | Physical position on ANSI keyboard |
+//! |-----|-----------|-------------------------------------|
+//! | A   | 0x00      | Leftmost home-row key               |
+//! | B   | 0x0B      | Bottom row, between V and N         |
+//! | S   | 0x01      | Second from left on home row        |
+//!
+//! This is different from USB HID (which also uses position codes but with
+//! different numbers) and from Windows VK codes (which are alphabetically ordered
+//! for letters).  The table in this file bridges the gap.
 
 use super::hid::HidKeyCode;
 

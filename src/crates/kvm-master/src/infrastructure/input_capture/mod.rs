@@ -13,6 +13,31 @@
 //!
 //! The `InputSource` trait allows unit tests to inject synthetic events without
 //! requiring Windows hooks.
+//!
+//! # What are low-level hooks? (for beginners)
+//!
+//! Windows allows applications to install "hooks" — callback functions that
+//! receive copies of system events before they are delivered to the focused
+//! window.  Two hooks are relevant here:
+//!
+//! - **`WH_KEYBOARD_LL`** — receives every keyboard event system-wide, even
+//!   when another application has the keyboard focus.
+//! - **`WH_MOUSE_LL`** — receives every mouse event system-wide.
+//!
+//! Both hooks run in the context of a *dedicated thread* that has its own Win32
+//! message queue.  The hook callback runs synchronously in that thread.  To
+//! avoid blocking it (which would cause the hook to be removed by Windows after
+//! ~300 ms), the callback copies the event data into an `mpsc` channel and
+//! returns immediately.  The Tokio async runtime then reads events from the
+//! channel on a separate thread.
+//!
+//! # Event suppression
+//!
+//! If the `suppress_current_event` method is called *before* the hook callback
+//! returns, the callback returns `LRESULT(1)` instead of calling
+//! `CallNextHookEx`.  This prevents the event from reaching the local desktop
+//! (e.g., so that mouse movements to a client screen do not also move the local
+//! cursor to some unintended position).
 
 use std::sync::mpsc;
 

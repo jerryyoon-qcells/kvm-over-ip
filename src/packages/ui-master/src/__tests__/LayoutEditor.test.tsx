@@ -1,3 +1,31 @@
+/**
+ * Tests for the `LayoutEditor` component.
+ *
+ * # What these tests verify
+ *
+ * - Loading state is shown while `isLoadingLayout` is `true`.
+ * - The layout canvas and screen tiles render once loading completes.
+ * - The master tile is always present.
+ * - Client tiles are rendered for each entry in the layout.
+ * - Apply and Reset buttons are present.
+ * - Clicking Apply sends the layout to the backend via `update_layout`.
+ * - A backend failure on Apply shows an inline error message.
+ * - Clicking Reset clears the error without re-fetching.
+ *
+ * # Why `get_layout` must be mocked for every test
+ *
+ * `LayoutEditor` mounts the `useLayout()` hook, which calls `get_layout`
+ * on mount.  If `get_layout` resolves with data, `isLoadingLayout` transitions
+ * to `false` and the canvas appears.  Every test that checks for elements
+ * that are hidden during loading must mock `get_layout` to give the hook a
+ * way to exit the loading state.
+ *
+ * # `waitFor` for async rendering
+ *
+ * The canvas and buttons only appear after the async `get_layout` call
+ * resolves.  `waitFor` retries the assertion until it passes or times out.
+ */
+
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -8,6 +36,8 @@ import type { ClientLayoutDto } from "../types";
 
 const mockInvoke = invoke as jest.MockedFunction<typeof invoke>;
 
+// ── Test isolation ─────────────────────────────────────────────────────────────
+
 afterEach(() => {
   useMasterStore.setState({
     layout: [],
@@ -17,6 +47,9 @@ afterEach(() => {
   mockInvoke.mockReset();
 });
 
+// ── Sample data ────────────────────────────────────────────────────────────────
+
+/** A layout with one client screen placed to the right of the master. */
 const sampleLayout: ClientLayoutDto[] = [
   {
     clientId: "aaaa-aaaa",
@@ -28,20 +61,22 @@ const sampleLayout: ClientLayoutDto[] = [
   },
 ];
 
+// ── Tests ──────────────────────────────────────────────────────────────────────
+
 describe("LayoutEditor", () => {
   test("shows loading state when layout is loading", () => {
-    // Arrange
+    // Arrange — simulate loading state
     useMasterStore.setState({ isLoadingLayout: true, layout: [] });
 
     // Act
     render(<LayoutEditor />);
 
-    // Assert
+    // Assert — loading indicator is visible
     expect(screen.getByRole("status")).toHaveTextContent(/loading/i);
   });
 
   test("renders the layout canvas when layout is loaded", async () => {
-    // Arrange: mock get_layout so useLayout hook resolves and exits loading state
+    // Arrange — mock get_layout so useLayout hook exits loading state
     mockInvoke.mockImplementation((cmd) => {
       if (cmd === "get_layout") {
         return Promise.resolve({ success: true, data: sampleLayout, error: null });
@@ -53,14 +88,14 @@ describe("LayoutEditor", () => {
     // Act
     render(<LayoutEditor />);
 
-    // Assert – wait for loading to finish before checking canvas
+    // Assert — wait for the async hook to complete before checking
     await waitFor(() =>
       expect(screen.getByTestId("layout-canvas")).toBeInTheDocument()
     );
   });
 
   test("renders the master screen tile", async () => {
-    // Arrange: mock get_layout so useLayout hook resolves and exits loading state
+    // Arrange — mock get_layout so the hook exits loading state
     mockInvoke.mockImplementation((cmd) => {
       if (cmd === "get_layout") {
         return Promise.resolve({ success: true, data: [], error: null });
@@ -72,14 +107,14 @@ describe("LayoutEditor", () => {
     // Act
     render(<LayoutEditor />);
 
-    // Assert – wait for loading to finish before checking master tile
+    // Assert — master tile is always rendered, regardless of client count
     await waitFor(() =>
       expect(screen.getByTestId("screen-tile-Master")).toBeInTheDocument()
     );
   });
 
   test("renders a tile for each client in the layout", async () => {
-    // Arrange: mock get_layout so useLayout hook resolves and exits loading state
+    // Arrange
     mockInvoke.mockImplementation((cmd) => {
       if (cmd === "get_layout") {
         return Promise.resolve({ success: true, data: sampleLayout, error: null });
@@ -91,14 +126,14 @@ describe("LayoutEditor", () => {
     // Act
     render(<LayoutEditor />);
 
-    // Assert – wait for loading to finish before checking client tile
+    // Assert — a tile for "dev-linux" should be visible
     await waitFor(() =>
       expect(screen.getByTestId("screen-tile-dev-linux")).toBeInTheDocument()
     );
   });
 
   test("renders Apply and Reset buttons", async () => {
-    // Arrange: mock get_layout so useLayout hook resolves and exits loading state
+    // Arrange
     mockInvoke.mockImplementation((cmd) => {
       if (cmd === "get_layout") {
         return Promise.resolve({ success: true, data: sampleLayout, error: null });
@@ -110,7 +145,7 @@ describe("LayoutEditor", () => {
     // Act
     render(<LayoutEditor />);
 
-    // Assert – wait for loading to finish before checking action buttons
+    // Assert
     await waitFor(() =>
       expect(screen.getByTestId("btn-apply-layout")).toBeInTheDocument()
     );
@@ -118,7 +153,7 @@ describe("LayoutEditor", () => {
   });
 
   test("apply button triggers layout save", async () => {
-    // Arrange: mock get_layout so the loading state resolves and buttons appear
+    // Arrange — mock both get_layout and update_layout to succeed
     mockInvoke.mockImplementation((cmd) => {
       if (cmd === "get_layout") {
         return Promise.resolve({ success: true, data: sampleLayout, error: null });
@@ -127,21 +162,21 @@ describe("LayoutEditor", () => {
     });
     useMasterStore.setState({ layout: sampleLayout, isLoadingLayout: false });
 
-    // Act: render and wait for loading to complete before clicking
+    // Act — render, wait for the Apply button, then click it
     render(<LayoutEditor />);
     await waitFor(() =>
       expect(screen.getByTestId("btn-apply-layout")).toBeInTheDocument()
     );
     fireEvent.click(screen.getByTestId("btn-apply-layout"));
 
-    // Assert – button re-enables after save completes
+    // Assert — button re-enables after save completes (no longer shows "Saving…")
     await waitFor(() =>
       expect(screen.getByTestId("btn-apply-layout")).not.toBeDisabled()
     );
   });
 
   test("shows error message when apply fails", async () => {
-    // Arrange: mock get_layout to resolve and update_layout to fail
+    // Arrange — get_layout succeeds but update_layout returns an error
     mockInvoke.mockImplementation((cmd) => {
       if (cmd === "get_layout") {
         return Promise.resolve({ success: true, data: sampleLayout, error: null });
@@ -153,21 +188,21 @@ describe("LayoutEditor", () => {
     });
     useMasterStore.setState({ layout: sampleLayout, isLoadingLayout: false });
 
-    // Act: render and wait for loading to complete before clicking
+    // Act
     render(<LayoutEditor />);
     await waitFor(() =>
       expect(screen.getByTestId("btn-apply-layout")).toBeInTheDocument()
     );
     fireEvent.click(screen.getByTestId("btn-apply-layout"));
 
-    // Assert
+    // Assert — error message from the backend is shown inline
     await waitFor(() =>
       expect(screen.getByTestId("layout-error")).toHaveTextContent("overlapping screens")
     );
   });
 
   test("reset button restores layout to store state", async () => {
-    // Arrange: mock get_layout so loading state resolves
+    // Arrange — mock get_layout so loading state resolves
     mockInvoke.mockImplementation((cmd) => {
       if (cmd === "get_layout") {
         return Promise.resolve({ success: true, data: sampleLayout, error: null });
@@ -176,14 +211,14 @@ describe("LayoutEditor", () => {
     });
     useMasterStore.setState({ layout: sampleLayout, isLoadingLayout: false });
 
-    // Act: render, wait for buttons, then reset
+    // Act — render, wait for Reset button, click it
     render(<LayoutEditor />);
     await waitFor(() =>
       expect(screen.getByTestId("btn-reset-layout")).toBeInTheDocument()
     );
     fireEvent.click(screen.getByTestId("btn-reset-layout"));
 
-    // Assert – no error state after reset
+    // Assert — clicking Reset clears any error state
     expect(screen.queryByTestId("layout-error")).not.toBeInTheDocument();
   });
 });

@@ -4,12 +4,42 @@
 //! a list of [`MonitorInfo`] records.  If the DISPLAY environment variable is
 //! not set or Xlib is unavailable the function returns an appropriate error.
 //!
-//! # Implementation notes
+//! # How X11 screen enumeration works (for beginners)
 //!
-//! This implementation uses the plain Xlib screen API which is always
-//! available without Xrandr.  A future enhancement can add Xrandr support for
-//! proper multi-monitor layouts when multiple CRTC outputs are attached to a
-//! single X screen.
+//! In X11 terminology, a *display* is the connection to the X server, and a
+//! *screen* is a logical grouping of outputs (monitors) managed by that display.
+//! Most modern desktop setups have exactly one screen that spans all physical
+//! monitors (multi-monitor is handled by Xrandr at a higher level).
+//!
+//! The Xlib functions used here:
+//!
+//! - `XOpenDisplay(null)` — opens a connection to the display named in the
+//!   `DISPLAY` environment variable (e.g., `:0` or `:0.0`).  Returns null on
+//!   failure.
+//! - `XScreenCount(display)` — returns how many logical screens exist.
+//! - `XDefaultScreen(display)` — returns the index of the default (primary) screen.
+//! - `XDisplayWidth(display, screen_num)` / `XDisplayHeight(...)` — pixel
+//!   dimensions of the screen.
+//! - `XCloseDisplay(display)` — closes the connection and frees memory.
+//!
+//! # Xrandr limitation
+//!
+//! Plain Xlib only knows about logical *screens*, not individual monitor
+//! *outputs* (CRTCs).  On a typical desktop with two monitors and a single
+//! Xrandr composite screen, `XScreenCount` returns 1 and `XDisplayWidth`
+//! returns the total combined width.
+//!
+//! To enumerate individual monitors properly on Linux, the Xrandr extension
+//! (`XRRGetScreenResourcesCurrent`, `XRRGetCrtcInfo`) would be needed.  That
+//! is a planned enhancement; the current implementation is correct for the
+//! common single-screen-per-X-display setup.
+//!
+//! # `DISPLAY` environment variable
+//!
+//! When running as a desktop application the `DISPLAY` variable is set
+//! automatically by the desktop session (e.g., `DISPLAY=:0`).  In headless
+//! environments (CI, SSH without X forwarding) it is unset and `XOpenDisplay`
+//! fails — this is the expected failure mode.
 
 use super::{PlatformScreenEnumerator, ScreenInfoError};
 use kvm_core::protocol::messages::MonitorInfo;
@@ -48,10 +78,12 @@ fn enumerate_via_xlib() -> Result<Vec<MonitorInfo>, ScreenInfoError> {
     use x11::xlib;
 
     // SAFETY: XOpenDisplay is called with a null-terminated display string.
+    // Passing null as the display name means "use the DISPLAY environment variable".
     // The returned pointer must be freed by XCloseDisplay.
     let display = unsafe { xlib::XOpenDisplay(std::ptr::null()) };
 
     if display.is_null() {
+        // XOpenDisplay failed — most likely DISPLAY is not set.
         let display_env = std::env::var("DISPLAY").unwrap_or_else(|_| "<unset>".to_string());
         return Err(ScreenInfoError::PlatformError(format!(
             "XOpenDisplay failed; DISPLAY={display_env}"
@@ -65,12 +97,13 @@ fn enumerate_via_xlib() -> Result<Vec<MonitorInfo>, ScreenInfoError> {
     let mut monitors = Vec::with_capacity(screen_count as usize);
 
     for screen_num in 0..screen_count {
-        // SAFETY: screen_num is in [0, screen_count).
+        // SAFETY: screen_num is in [0, screen_count), which is the valid range.
         let width = unsafe { xlib::XDisplayWidth(display, screen_num) } as u32;
         let height = unsafe { xlib::XDisplayHeight(display, screen_num) } as u32;
 
-        // Xlib does not expose per-screen offsets without Xrandr.
-        // For a single-screen setup (common case) the offset is always (0, 0).
+        // Xlib does not expose per-screen pixel offsets without Xrandr.
+        // For a single-screen setup (the common case) the offset is always (0, 0).
+        // A future Xrandr implementation would fill these in properly.
         let x_offset = 0i32;
         let y_offset = 0i32;
 
@@ -81,6 +114,7 @@ fn enumerate_via_xlib() -> Result<Vec<MonitorInfo>, ScreenInfoError> {
             x_offset,
             y_offset,
             scale_factor: 100,
+            // The default screen is treated as the primary monitor.
             is_primary: screen_num == default_screen,
         });
     }

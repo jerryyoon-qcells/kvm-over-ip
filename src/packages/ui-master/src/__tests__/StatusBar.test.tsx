@@ -1,9 +1,29 @@
+/**
+ * Tests for the `StatusBar` component.
+ *
+ * # What these tests verify
+ *
+ * - Connected client count is computed correctly (only "Connected" and "Paired"
+ *   states are counted; "Disconnected", "Discovered", "Connecting" are not).
+ * - The count uses correct singular/plural grammar.
+ * - Sharing state shows "ON" or "OFF".
+ * - Error message is rendered only when `lastError` is non-null.
+ *
+ * # Fixtures
+ *
+ * `connectedClient` and `disconnectedClient` are pre-built `ClientDto` objects
+ * reused across multiple tests.  The `afterEach` hook resets the store so each
+ * test starts from a clean state.
+ */
+
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { StatusBar } from "../components/StatusBar";
 import { useMasterStore } from "../store";
 import type { ClientDto } from "../types";
+
+// ── Test isolation ─────────────────────────────────────────────────────────────
 
 // Reset store between tests
 afterEach(() => {
@@ -14,6 +34,9 @@ afterEach(() => {
   });
 });
 
+// ── Fixtures ───────────────────────────────────────────────────────────────────
+
+/** A client in "Connected" state — should be counted in the connected total. */
 const connectedClient: ClientDto = {
   clientId: "11111111-1111-1111-1111-111111111111",
   name: "dev-linux",
@@ -22,6 +45,7 @@ const connectedClient: ClientDto = {
   eventsPerSecond: 45,
 };
 
+/** A client in "Disconnected" state — must NOT be counted in the connected total. */
 const disconnectedClient: ClientDto = {
   clientId: "22222222-2222-2222-2222-222222222222",
   name: "macbook",
@@ -29,6 +53,8 @@ const disconnectedClient: ClientDto = {
   latencyMs: 0,
   eventsPerSecond: 0,
 };
+
+// ── Tests ──────────────────────────────────────────────────────────────────────
 
 describe("StatusBar", () => {
   test("shows zero clients when no clients are registered", () => {
@@ -38,7 +64,7 @@ describe("StatusBar", () => {
     // Act
     render(<StatusBar />);
 
-    // Assert
+    // Assert — "0 clients connected" (plural because count != 1)
     expect(screen.getByTestId("status-clients")).toHaveTextContent(
       "0 clients connected"
     );
@@ -51,7 +77,7 @@ describe("StatusBar", () => {
     // Act
     render(<StatusBar />);
 
-    // Assert
+    // Assert — "1 client connected" (singular)
     expect(screen.getByTestId("status-clients")).toHaveTextContent(
       "1 client connected"
     );
@@ -65,20 +91,20 @@ describe("StatusBar", () => {
     // Act
     render(<StatusBar />);
 
-    // Assert
+    // Assert — "2 clients connected" (plural)
     expect(screen.getByTestId("status-clients")).toHaveTextContent(
       "2 clients connected"
     );
   });
 
   test("does not count disconnected clients in the connected total", () => {
-    // Arrange
+    // Arrange — one connected + one disconnected
     useMasterStore.setState({ clients: [connectedClient, disconnectedClient] });
 
     // Act
     render(<StatusBar />);
 
-    // Assert
+    // Assert — only the connected one is counted
     expect(screen.getByTestId("status-clients")).toHaveTextContent(
       "1 client connected"
     );
@@ -113,7 +139,7 @@ describe("StatusBar", () => {
     // Act
     render(<StatusBar />);
 
-    // Assert
+    // Assert — error element must be completely absent from the DOM
     expect(screen.queryByTestId("status-error")).not.toBeInTheDocument();
   });
 
@@ -124,7 +150,7 @@ describe("StatusBar", () => {
     // Act
     render(<StatusBar />);
 
-    // Assert
+    // Assert — error is displayed with the "Error:" prefix
     expect(screen.getByTestId("status-error")).toHaveTextContent(
       "Error: connection refused"
     );

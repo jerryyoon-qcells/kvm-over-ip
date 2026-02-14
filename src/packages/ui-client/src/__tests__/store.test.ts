@@ -1,6 +1,29 @@
+/**
+ * Tests for the `useClientStore` Zustand store.
+ *
+ * # What these tests verify
+ *
+ * Each action in the store (`setStatus`, `setSettings`, etc.) is tested to
+ * confirm it writes the expected value to the store and that the initial
+ * state is correct.
+ *
+ * # Test isolation
+ *
+ * The `afterEach` hook resets the store to its initial state after every test.
+ * Without this reset, state written by one test would leak into the next test,
+ * making tests order-dependent and unreliable.
+ *
+ * Zustand exposes `useClientStore.setState(...)` for direct state manipulation
+ * in tests — this bypasses actions and lets us set up specific starting
+ * conditions quickly.
+ */
+
 import { useClientStore } from "../store";
 import type { ClientStatusDto, ClientSettingsDto } from "../types";
 
+// ── Test isolation ─────────────────────────────────────────────────────────────
+
+// Reset the store to defaults after each test to prevent state leakage
 afterEach(() => {
   useClientStore.setState({
     status: null,
@@ -9,6 +32,8 @@ afterEach(() => {
     lastError: null,
   });
 });
+
+// ── Tests ──────────────────────────────────────────────────────────────────────
 
 describe("useClientStore", () => {
   test("setStatus stores the status", () => {
@@ -58,10 +83,10 @@ describe("useClientStore", () => {
   });
 
   test("setLastError clears the error when null is passed", () => {
-    // Arrange
+    // Arrange — seed an error
     useClientStore.getState().setLastError("some error");
 
-    // Act
+    // Act — clear it
     useClientStore.getState().setLastError(null);
 
     // Assert
@@ -69,10 +94,12 @@ describe("useClientStore", () => {
   });
 
   test("initial status is null", () => {
+    // Assert — the store should start with no status data
     expect(useClientStore.getState().status).toBeNull();
   });
 
   test("initial loading flag is false", () => {
+    // Assert — the store should not start in a loading state
     expect(useClientStore.getState().isLoading).toBe(false);
   });
 });

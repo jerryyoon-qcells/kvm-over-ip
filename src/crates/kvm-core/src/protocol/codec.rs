@@ -5,41 +5,92 @@
 //! [version:1][msg_type:1][reserved:2][payload_len:4][seq:8][timestamp_us:8][payload:N]
 //! ```
 //! Total header size: 24 bytes. All multi-byte integers are big-endian.
+//!
+//! # How this codec works (for beginners)
+//!
+//! **Encoding** converts a typed Rust value (e.g., `KvmMessage::Ping(42)`) into
+//! a flat sequence of bytes that can be sent over a TCP socket.  The process is:
+//!
+//! 1. Call `encode_payload` to serialise only the message-specific fields.
+//! 2. Build the 24-byte header (version, type, reserved, payload_len, seq, ts).
+//! 3. Concatenate header + payload into a single `Vec<u8>`.
+//!
+//! **Decoding** is the reverse:
+//!
+//! 1. Check there are at least 24 bytes.
+//! 2. Read and validate the version byte.
+//! 3. Read the message type byte and look it up in `MessageType`.
+//! 4. Read the payload length and verify enough bytes are available.
+//! 5. Call `decode_payload` to reconstruct the typed struct from the bytes.
+//! 6. Return the typed message plus the number of bytes consumed.
+//!
+//! The "number of bytes consumed" return value lets callers implement a
+//! streaming read loop: keep calling `decode_message` and advance the buffer
+//! by that many bytes until there is not enough data left to form a header.
+//!
+//! # Endianness note
+//!
+//! All multi-byte integers (u16, i16, u32, i32, u64, i64) are stored in
+//! **big-endian** byte order (most significant byte first).  This is the
+//! network standard (RFC 791) and makes the binary format readable with a
+//! hex dump without any byte-swapping surprises.  In Rust the conversion is
+//! done with `.to_be_bytes()` for encoding and `T::from_be_bytes([...])` for
+//! decoding.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::keymap::hid::HidKeyCode;
 use crate::protocol::messages::{
     AnnounceMessage, AnnounceResponseMessage, ButtonEventType, ClipboardDataMessage,
-    ClipboardFormat, DisconnectReason, ErrorMessage, HelloAckMessage, HelloMessage, InputEvent,
-    KeyEventMessage, KeyEventType, KvmMessage, MessageType, ModifierFlags,
-    MonitorInfo, MouseButton, MouseButtonMessage, MouseMoveMessage, MouseScrollMessage,
-    PairingRequestMessage, PairingResponseMessage, PlatformId, ProtocolErrorCode,
-    ScreenInfoMessage, HEADER_SIZE, PROTOCOL_VERSION,
+    ClipboardFormat, ConfigUpdateMessage, DisconnectReason, ErrorMessage, HelloAckMessage,
+    HelloMessage, InputEvent, KeyEventMessage, KeyEventType, KvmMessage, MessageType,
+    ModifierFlags, MonitorInfo, MouseButton, MouseButtonMessage, MouseMoveMessage,
+    MouseScrollMessage, PairingRequestMessage, PairingResponseMessage, PlatformId,
+    ProtocolErrorCode, ScreenInfoMessage, HEADER_SIZE, PROTOCOL_VERSION,
 };
 use thiserror::Error;
 use uuid::Uuid;
 
 /// Errors that can occur during message encoding or decoding.
+///
+/// These variants are returned as `Err(ProtocolError::...)` from both
+/// `encode_message` and `decode_message`.  Callers should match on the
+/// specific variant to decide whether to log the error, close the connection,
+/// or request a retransmit.
 #[derive(Debug, Error, PartialEq)]
 pub enum ProtocolError {
     /// The byte slice is shorter than the minimum required length.
+    ///
+    /// When this occurs during streaming reads it usually means the full
+    /// message has not yet arrived.  The caller should buffer the data and
+    /// retry once more bytes are available.
     #[error("insufficient data: need at least {needed} bytes, got {available}")]
     InsufficientData { needed: usize, available: usize },
 
     /// The message type byte in the header is not a recognized value.
+    ///
+    /// This normally indicates a protocol version mismatch or a corrupted
+    /// message.  The connection should be closed.
     #[error("unknown message type: 0x{0:02X}")]
     UnknownMessageType(u8),
 
     /// The protocol version in the header is not supported.
+    ///
+    /// Returned when byte 0 of the header is not equal to `PROTOCOL_VERSION`.
     #[error("unsupported protocol version: {0}")]
     UnsupportedVersion(u8),
 
     /// The payload could not be parsed (field value out of range, UTF-8 error, etc.).
+    ///
+    /// The string argument describes what specifically failed.  This is for
+    /// logging; do not display it to end users.
     #[error("malformed payload: {0}")]
     MalformedPayload(String),
 
     /// The encoded payload length field does not match the actual data available.
+    ///
+    /// `declared` is what the header claims and `available` is what is actually
+    /// present.  This indicates either a truncated message or a buggy encoder.
     #[error("payload length mismatch: header says {declared}, available is {available}")]
     PayloadLengthMismatch { declared: usize, available: usize },
 }
@@ -50,6 +101,16 @@ pub enum ProtocolError {
 ///
 /// The sequence number is **not** set by this function – pass a pre-incremented
 /// value from a [`crate::protocol::SequenceCounter`].
+///
+/// The caller is responsible for maintaining the `sequence_number` counter.
+/// Use [`crate::protocol::SequenceCounter::next`] to obtain a fresh value for
+/// each message sent on a channel.
+///
+/// # Parameters
+///
+/// - `msg`             – The message to encode.
+/// - `sequence_number` – Monotonically increasing counter value for this message.
+/// - `timestamp_us`    – Microseconds since Unix epoch; use 0 in tests.
 ///
 /// # Errors
 ///
@@ -92,6 +153,10 @@ pub fn encode_message(
 }
 
 /// Encodes a [`KvmMessage`] using the current system time as the timestamp.
+///
+/// This is a convenience wrapper around `encode_message` that automatically
+/// reads the system clock.  Use this in production code; use `encode_message`
+/// with a fixed timestamp only in tests that need deterministic output.
 ///
 /// # Errors
 ///
@@ -164,6 +229,8 @@ pub fn decode_message(bytes: &[u8]) -> Result<(KvmMessage, usize), ProtocolError
 
 // ── Payload encoding ──────────────────────────────────────────────────────────
 
+/// Dispatches to the message-specific encode helper and returns the serialised
+/// payload bytes.  The 24-byte header is added by the caller (`encode_message`).
 fn encode_payload(msg: &KvmMessage) -> Result<Vec<u8>, ProtocolError> {
     let mut buf = Vec::new();
     match msg {
@@ -178,6 +245,7 @@ fn encode_payload(msg: &KvmMessage) -> Result<Vec<u8>, ProtocolError> {
         KvmMessage::Disconnect { reason } => buf.push(*reason as u8),
         KvmMessage::Error(m) => encode_error(&mut buf, m),
         KvmMessage::ClipboardData(m) => encode_clipboard_data(&mut buf, m),
+        KvmMessage::ConfigUpdate(m) => encode_config_update(&mut buf, m),
         KvmMessage::KeyEvent(m) => encode_key_event(&mut buf, m),
         KvmMessage::MouseMove(m) => encode_mouse_move(&mut buf, m),
         KvmMessage::MouseButton(m) => encode_mouse_button(&mut buf, m),
@@ -191,6 +259,8 @@ fn encode_payload(msg: &KvmMessage) -> Result<Vec<u8>, ProtocolError> {
 
 // ── Payload decoding ──────────────────────────────────────────────────────────
 
+/// Dispatches to the message-specific decode helper based on the type code
+/// that was read from the header.  Returns the fully-typed [`KvmMessage`].
 fn decode_payload(msg_type: MessageType, payload: &[u8]) -> Result<KvmMessage, ProtocolError> {
     match msg_type {
         MessageType::Hello => decode_hello(payload).map(KvmMessage::Hello),
@@ -219,10 +289,11 @@ fn decode_payload(msg_type: MessageType, payload: &[u8]) -> Result<KvmMessage, P
         }
         MessageType::Error => decode_error(payload).map(KvmMessage::Error),
         MessageType::ClipboardData => decode_clipboard_data(payload).map(KvmMessage::ClipboardData),
-        MessageType::ConfigUpdate => {
-            // Placeholder: CONFIG_UPDATE payload is not specified yet
-            Ok(KvmMessage::ScreenInfoAck) // treated as no-op in this version
-        }
+        // FIX (Bug 2): The previous code returned Ok(KvmMessage::ScreenInfoAck) here,
+        // which is the wrong message type entirely.  A receiver would silently treat
+        // every ConfigUpdate as a ScreenInfoAck, ignoring the real configuration data.
+        // Now we decode the actual payload into the correct KvmMessage::ConfigUpdate.
+        MessageType::ConfigUpdate => decode_config_update(payload).map(KvmMessage::ConfigUpdate),
         MessageType::KeyEvent => decode_key_event(payload).map(KvmMessage::KeyEvent),
         MessageType::MouseMove => decode_mouse_move(payload).map(KvmMessage::MouseMove),
         MessageType::MouseButton => decode_mouse_button(payload).map(KvmMessage::MouseButton),
@@ -236,6 +307,13 @@ fn decode_payload(msg_type: MessageType, payload: &[u8]) -> Result<KvmMessage, P
 }
 
 // ── Per-message encode helpers ────────────────────────────────────────────────
+//
+// Each function below appends the fields of one specific message type to `buf`
+// in the exact byte order defined by the wire format.  The comments above each
+// function show the byte layout.
+//
+// Convention: `buf` is always modified in-place (appended to), never reallocated
+// from scratch.  This avoids extra heap allocations.
 
 fn encode_hello(buf: &mut Vec<u8>, m: &HelloMessage) {
     buf.extend_from_slice(m.client_id.as_bytes());
@@ -286,6 +364,30 @@ fn encode_clipboard_data(buf: &mut Vec<u8>, m: &ClipboardDataMessage) {
     buf.extend_from_slice(&(m.data.len() as u32).to_be_bytes());
     buf.extend_from_slice(&m.data);
     buf.push(if m.has_more_fragments { 0x01 } else { 0x00 });
+}
+
+/// Encodes a [`ConfigUpdateMessage`] into `buf`.
+///
+/// Wire layout (all multi-byte integers are big-endian):
+/// ```text
+/// [log_level_len    : 2 bytes][log_level     : N bytes]
+/// [disable_hotkey_len : 2 bytes][disable_hotkey : M bytes]
+/// [flags            : 4 bytes]
+/// ```
+///
+/// # Why two length-prefixed strings?
+///
+/// Variable-length strings cannot be stored as plain bytes without a length
+/// marker; the decoder would not know where one string ends and the next
+/// begins.  Prefixing each string with its 2-byte length (big-endian u16)
+/// solves this without needing a sentinel character.
+fn encode_config_update(buf: &mut Vec<u8>, m: &ConfigUpdateMessage) {
+    // Write log_level as a 2-byte-length-prefixed UTF-8 string.
+    write_length_prefixed_string(buf, &m.log_level);
+    // Write disable_hotkey as a 2-byte-length-prefixed UTF-8 string.
+    write_length_prefixed_string(buf, &m.disable_hotkey);
+    // Write the packed boolean flags as a 4-byte big-endian unsigned integer.
+    buf.extend_from_slice(&m.flags.to_be_bytes());
 }
 
 fn encode_key_event(buf: &mut Vec<u8>, m: &KeyEventMessage) {
@@ -353,9 +455,16 @@ fn encode_announce_response(buf: &mut Vec<u8>, m: &AnnounceResponseMessage) {
 }
 
 // ── Per-message decode helpers ────────────────────────────────────────────────
+//
+// Each function below reads fields from the raw payload slice `p` in the same
+// order they were written by the corresponding encode helper.  Comments show
+// the minimum byte count and what each range contains.
+//
+// All functions return `ProtocolError::MalformedPayload` if a field value is
+// out of range.  They never panic on invalid input.
 
 fn decode_hello(p: &[u8]) -> Result<HelloMessage, ProtocolError> {
-    // 16 (uuid) + 1 (proto ver) + 1 (platform) + 2 (name_len) + name + 4 (caps) >= 24
+    // Minimum layout: 16 (uuid) + 1 (proto ver) + 1 (platform) + 2 (name_len) + name + 4 (caps)
     require_len(p, 24, "Hello")?;
     let client_id = read_uuid(p, 0)?;
     let protocol_version = p[16];
@@ -477,6 +586,49 @@ fn decode_clipboard_data(p: &[u8]) -> Result<ClipboardDataMessage, ProtocolError
     })
 }
 
+/// Decodes a [`ConfigUpdateMessage`] from the raw payload bytes `p`.
+///
+/// Expected layout:
+/// ```text
+/// [log_level_len    : 2][log_level     : N]
+/// [disable_hotkey_len : 2][disable_hotkey : M]
+/// [flags            : 4]
+/// ```
+/// Minimum size: 2 + 0 + 2 + 0 + 4 = 8 bytes (both strings empty, just lengths + flags).
+///
+/// # Why validate the minimum length?
+///
+/// Without a minimum-length check, a truncated packet could cause the decoder
+/// to read past the end of the buffer, which would panic in debug builds or
+/// silently produce garbage in release builds.  Fail fast with a clear error
+/// instead.
+fn decode_config_update(p: &[u8]) -> Result<ConfigUpdateMessage, ProtocolError> {
+    // Minimum payload: 2-byte log_level_len + 2-byte hotkey_len + 4-byte flags = 8 bytes.
+    // (Both strings may have zero length, which is valid.)
+    require_len(p, 8, "ConfigUpdate")?;
+
+    // Read the log_level string starting at offset 0.
+    let (log_level, after_log_level) = read_length_prefixed_string(p, 0)?;
+
+    // Read the disable_hotkey string immediately after log_level.
+    let (disable_hotkey, after_hotkey) = read_length_prefixed_string(p, after_log_level)?;
+
+    // Read the 4-byte flags field immediately after disable_hotkey.
+    require_len(p, after_hotkey + 4, "ConfigUpdate.flags")?;
+    let flags = u32::from_be_bytes([
+        p[after_hotkey],
+        p[after_hotkey + 1],
+        p[after_hotkey + 2],
+        p[after_hotkey + 3],
+    ]);
+
+    Ok(ConfigUpdateMessage {
+        log_level,
+        disable_hotkey,
+        flags,
+    })
+}
+
 fn decode_key_event(p: &[u8]) -> Result<KeyEventMessage, ProtocolError> {
     // 2 (key_code) + 2 (scan_code) + 1 (event_type) + 1 (modifiers) = 6
     require_len(p, 6, "KeyEvent")?;
@@ -595,6 +747,12 @@ fn decode_announce_response(p: &[u8]) -> Result<AnnounceResponseMessage, Protoco
 
 // ── Utility helpers ───────────────────────────────────────────────────────────
 
+/// Checks that `buf` is at least `needed` bytes long.
+///
+/// Returns `Err(ProtocolError::MalformedPayload)` with a message that includes
+/// `context` (the field name) if the check fails.  This makes error messages
+/// like "Hello.capabilities: need 4 bytes, got 2" instead of a generic index
+/// out-of-bounds panic.
 fn require_len(buf: &[u8], needed: usize, context: &str) -> Result<(), ProtocolError> {
     if buf.len() < needed {
         Err(ProtocolError::MalformedPayload(format!(
@@ -606,6 +764,10 @@ fn require_len(buf: &[u8], needed: usize, context: &str) -> Result<(), ProtocolE
     }
 }
 
+/// Reads a big-endian u64 from `buf` starting at `offset`.
+///
+/// Returns `Err(ProtocolError::InsufficientData)` if fewer than 8 bytes are
+/// available at the given offset.
 fn read_u64(buf: &[u8], offset: usize) -> Result<u64, ProtocolError> {
     if buf.len() < offset + 8 {
         return Err(ProtocolError::InsufficientData {
@@ -625,6 +787,8 @@ fn read_u64(buf: &[u8], offset: usize) -> Result<u64, ProtocolError> {
     ]))
 }
 
+/// Reads 16 bytes from `buf` at `offset` and interprets them as a UUID (in
+/// big-endian byte order, which is the standard UUID wire format).
 fn read_uuid(buf: &[u8], offset: usize) -> Result<Uuid, ProtocolError> {
     if buf.len() < offset + 16 {
         return Err(ProtocolError::MalformedPayload(format!(
@@ -636,15 +800,34 @@ fn read_uuid(buf: &[u8], offset: usize) -> Result<Uuid, ProtocolError> {
 }
 
 /// Writes a 2-byte length prefix followed by the UTF-8 string bytes.
+///
+/// This is the "Pascal string" encoding: [len_hi][len_lo][bytes...].
+/// The 2-byte length field limits strings to at most 65,535 bytes.
+/// Any excess is silently truncated (strings longer than 64 KiB are unusual
+/// in this protocol).
 fn write_length_prefixed_string(buf: &mut Vec<u8>, s: &str) {
     let bytes = s.as_bytes();
+    // Clamp to u16::MAX to guard against unreasonably long strings.
     let len = bytes.len().min(u16::MAX as usize) as u16;
+    // Write the length as a big-endian 2-byte integer.
     buf.extend_from_slice(&len.to_be_bytes());
+    // Write exactly `len` bytes of the string content.
     buf.extend_from_slice(&bytes[..len as usize]);
 }
 
 /// Reads a 2-byte length prefix and then that many UTF-8 bytes.
-/// Returns the string and the offset of the byte after the string.
+///
+/// Returns the decoded string and the byte offset immediately *after* the
+/// string (i.e., the index at which the next field begins).  This "cursor"
+/// approach avoids the need to track a mutable position variable in the
+/// caller.
+///
+/// # Errors
+///
+/// Returns [`ProtocolError::MalformedPayload`] if:
+/// - Fewer than 2 bytes are available for the length prefix.
+/// - The declared string length exceeds the remaining buffer.
+/// - The bytes are not valid UTF-8.
 fn read_length_prefixed_string(buf: &[u8], offset: usize) -> Result<(String, usize), ProtocolError> {
     if buf.len() < offset + 2 {
         return Err(ProtocolError::MalformedPayload(format!(
@@ -896,6 +1079,124 @@ mod tests {
             has_more_fragments: true,
         });
         assert_eq!(round_trip(&msg), msg);
+    }
+
+    // ── ConfigUpdate ──────────────────────────────────────────────────────────
+    //
+    // These tests verify the fix for Bug 2: ConfigUpdateMessage was previously
+    // missing from KvmMessage, and the decoder returned the wrong variant.
+
+    #[test]
+    fn test_config_update_round_trip_typical() {
+        // Arrange: a realistic config update sent from master to client.
+        let msg = KvmMessage::ConfigUpdate(ConfigUpdateMessage {
+            log_level: "info".to_string(),
+            disable_hotkey: "ScrollLock+ScrollLock".to_string(),
+            flags: config_flags::AUTOSTART,
+        });
+
+        // Act + Assert: encode then decode must produce the identical message.
+        assert_eq!(round_trip(&msg), msg);
+    }
+
+    #[test]
+    fn test_config_update_round_trip_empty_strings() {
+        // Arrange: both string fields are empty — this is a valid (minimal) payload.
+        let msg = KvmMessage::ConfigUpdate(ConfigUpdateMessage {
+            log_level: String::new(),
+            disable_hotkey: String::new(),
+            flags: 0,
+        });
+
+        // Act + Assert
+        assert_eq!(round_trip(&msg), msg);
+    }
+
+    #[test]
+    fn test_config_update_round_trip_all_flags_set() {
+        // Arrange: all 32 flag bits set — the decoder must preserve the full value.
+        let msg = KvmMessage::ConfigUpdate(ConfigUpdateMessage {
+            log_level: "trace".to_string(),
+            disable_hotkey: "F12".to_string(),
+            flags: u32::MAX,
+        });
+
+        // Act + Assert
+        assert_eq!(round_trip(&msg), msg);
+    }
+
+    #[test]
+    fn test_config_update_round_trip_debug_log_level() {
+        // Arrange: verify non-default log levels survive the wire.
+        let msg = KvmMessage::ConfigUpdate(ConfigUpdateMessage {
+            log_level: "debug".to_string(),
+            disable_hotkey: "Ctrl+Alt+F1".to_string(),
+            flags: 0,
+        });
+
+        // Act + Assert
+        assert_eq!(round_trip(&msg), msg);
+    }
+
+    #[test]
+    fn test_config_update_message_type_byte_is_0x0c() {
+        // Arrange: encode a ConfigUpdate and inspect the raw header byte.
+        let msg = KvmMessage::ConfigUpdate(ConfigUpdateMessage {
+            log_level: "info".to_string(),
+            disable_hotkey: String::new(),
+            flags: 0,
+        });
+
+        // Act
+        let bytes = encode_message(&msg, 0, 0).unwrap();
+
+        // Assert: byte[1] of the header is the message type — must be 0x0C.
+        // This confirms the variant is wired to the correct MessageType discriminant.
+        assert_eq!(bytes[1], 0x0C, "ConfigUpdate must encode with message type 0x0C");
+    }
+
+    #[test]
+    fn test_config_update_decode_truncated_payload_returns_error() {
+        // Arrange: build a syntactically valid header that claims a 2-byte payload,
+        // but a ConfigUpdate needs at least 8 bytes (two empty string prefixes + flags).
+        let mut bytes = vec![0u8; 24 + 2]; // header + 2-byte payload
+        bytes[0] = PROTOCOL_VERSION;
+        bytes[1] = 0x0C; // ConfigUpdate
+        // payload_length field is bytes[4..8]
+        let payload_len = 2u32;
+        bytes[4..8].copy_from_slice(&payload_len.to_be_bytes());
+        // Remaining bytes are zero (the "payload"), which is only 2 bytes.
+
+        // Act
+        let result = decode_message(&bytes);
+
+        // Assert: the decoder must return an error, not silently produce garbage.
+        assert!(
+            result.is_err(),
+            "decoding a truncated ConfigUpdate payload must return an error"
+        );
+    }
+
+    #[test]
+    fn test_config_update_decode_returns_config_update_variant_not_screen_info_ack() {
+        // Arrange: this test specifically guards against the regression where the
+        // decoder returned KvmMessage::ScreenInfoAck for a ConfigUpdate message.
+        let original = KvmMessage::ConfigUpdate(ConfigUpdateMessage {
+            log_level: "warn".to_string(),
+            disable_hotkey: "ScrollLock".to_string(),
+            flags: 0,
+        });
+        let bytes = encode_message(&original, 0, 0).unwrap();
+
+        // Act
+        let (decoded, _) = decode_message(&bytes).unwrap();
+
+        // Assert: must be ConfigUpdate, never ScreenInfoAck.
+        assert!(
+            matches!(decoded, KvmMessage::ConfigUpdate(_)),
+            "ConfigUpdate bytes must decode to KvmMessage::ConfigUpdate, not {:?}",
+            decoded
+        );
     }
 
     // ── KeyEvent ──────────────────────────────────────────────────────────────

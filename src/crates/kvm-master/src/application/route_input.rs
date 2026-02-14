@@ -4,11 +4,32 @@
 //! events from the capture service, consults the [`VirtualLayout`] for routing
 //! decisions, and dispatches translated messages to the [`InputTransmitter`].
 //!
-//! # Architecture
+//! # Architecture (for beginners)
 //!
-//! This use case depends only on traits (`InputTransmitter`, `CursorController`)
-//! and domain types (`VirtualLayout`). All infrastructure implementations are
-//! injected at construction time, making the use case fully unit-testable.
+//! This use case sits in the *Application* layer of Clean Architecture.  It:
+//!
+//! - Depends only on **traits** (`InputTransmitter`, `CursorController`) and
+//!   **domain types** (`VirtualLayout`), not on any concrete OS or network code.
+//! - Has all its real infrastructure dependencies injected at construction time
+//!   (see `RouteInputUseCase::new`), which makes the use case fully
+//!   unit-testable using the `RecordingTransmitter` and
+//!   `RecordingCursorController` test doubles defined at the bottom.
+//!
+//! # Event flow
+//!
+//! ```text
+//! Windows hook (WH_KEYBOARD_LL / WH_MOUSE_LL)
+//!   └─ RawInputEvent sent over mpsc channel
+//!        └─ RouteInputUseCase::handle_event()
+//!             ├─ Update modifier key state
+//!             ├─ Check for hotkey (ScrollLock: toggle sharing on/off)
+//!             ├─ Check for edge transition (cursor near screen boundary)
+//!             │    └─ apply_transition():
+//!             │         ├─ Update active_target
+//!             │         ├─ Teleport physical cursor (CursorController)
+//!             │         └─ Send entry position to new client (InputTransmitter)
+//!             └─ Forward event to active client (InputTransmitter)
+//! ```
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -29,20 +50,46 @@ use uuid::Uuid;
 use crate::infrastructure::input_capture::{MouseButton as RawMouseButton, RawInputEvent};
 
 /// Debounce duration for edge transitions to prevent oscillation.
+///
+/// Without debouncing, the cursor can "bounce" between master and client
+/// rapidly: the transition fires, the physical cursor is teleported back to
+/// the master, and before the next OS event arrives the cursor is *still* at
+/// the edge, triggering the transition again immediately.
+///
+/// By recording the time of the last transition and refusing to fire again
+/// within 50 ms, we give the cursor controller time to move the physical
+/// cursor away from the edge before the next check.
 const TRANSITION_DEBOUNCE: Duration = Duration::from_millis(50);
 
 /// Error type for the route-input use case.
+///
+/// These errors are returned as `Err(RouteError::...)` from `handle_event`.
+/// The caller should log the error and decide whether to stop routing or
+/// continue with degraded service.
 #[derive(Debug, Error)]
 pub enum RouteError {
+    /// The `InputTransmitter` failed to deliver a message to the client.
+    /// The inner `String` contains a human-readable description from the
+    /// transmitter implementation.
     #[error("transmitter error: {0}")]
     Transmit(String),
+    /// A routing decision was attempted but no layout has been configured yet.
     #[error("no layout configured")]
     NoLayout,
 }
 
 /// Trait for sending translated input events to a remote client.
 ///
-/// Infrastructure implementations use DTLS; test implementations record calls.
+/// Infrastructure implementations use DTLS (secure datagram transport) to
+/// deliver events over the network; test implementations record all calls so
+/// tests can assert on which events were sent.
+///
+/// # Design note
+///
+/// This is an example of the **Dependency Inversion Principle**: the use case
+/// (high-level policy) depends on this abstract trait rather than on a
+/// concrete network implementation (low-level detail).  This makes it possible
+/// to test the routing logic in isolation without a real network.
 #[async_trait]
 pub trait InputTransmitter: Send + Sync {
     /// Sends a keyboard event to the specified client.
@@ -86,6 +133,11 @@ pub trait CursorController: Send + Sync {
 }
 
 /// Tracks which machine currently has the active keyboard/mouse focus.
+///
+/// When the user's cursor is on the master screen, `ActiveTarget::Master` means
+/// all input events are processed locally (not sent anywhere).  When the cursor
+/// crosses to a client screen, `ActiveTarget::Client(cid)` means events are
+/// serialised and transmitted to that client.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActiveTarget {
     /// Input goes to the local master system.
@@ -101,6 +153,14 @@ impl Default for ActiveTarget {
 }
 
 /// The current modifier key state maintained across key-down/up events.
+///
+/// Windows low-level hooks receive individual key-down and key-up events for
+/// modifier keys (Shift, Ctrl, Alt, Meta) just like regular keys.  We track
+/// each modifier's state here so we can include an accurate `ModifierFlags`
+/// bitmask with every forwarded key event.
+///
+/// This is a private implementation detail; callers only see the packed
+/// `ModifierFlags` value produced by `to_flags()`.
 #[derive(Debug, Default, Clone, Copy)]
 struct ModifierState {
     left_ctrl: bool,
@@ -114,6 +174,9 @@ struct ModifierState {
 }
 
 impl ModifierState {
+    /// Packs the current modifier state into the compact `ModifierFlags` bitmask.
+    ///
+    /// Each `bool` field maps to one bit.  `true` sets the bit, `false` clears it.
     fn to_flags(self) -> ModifierFlags {
         let mut flags = 0u8;
         if self.left_ctrl { flags |= ModifierFlags::LEFT_CTRL; }
@@ -127,6 +190,16 @@ impl ModifierState {
         ModifierFlags(flags)
     }
 
+    /// Updates the state of a single modifier key based on a Windows VK code.
+    ///
+    /// `vk` is the Windows Virtual Key code from the low-level hook struct.
+    /// `is_down` is `true` for key-down events, `false` for key-up.
+    ///
+    /// The Windows VK codes for modifier keys:
+    /// - 0xA2 = VK_LCONTROL, 0xA3 = VK_RCONTROL
+    /// - 0xA0 = VK_LSHIFT,   0xA1 = VK_RSHIFT
+    /// - 0xA4 = VK_LMENU (Alt), 0xA5 = VK_RMENU
+    /// - 0x5B = VK_LWIN,     0x5C = VK_RWIN
     fn update(&mut self, vk: u8, is_down: bool) {
         match vk {
             0xA2 => self.left_ctrl = is_down,
@@ -137,7 +210,7 @@ impl ModifierState {
             0xA5 => self.right_alt = is_down,
             0x5B => self.left_meta = is_down,
             0x5C => self.right_meta = is_down,
-            _ => {}
+            _ => {} // Not a modifier key; ignore.
         }
     }
 }
@@ -459,6 +532,11 @@ impl RouteInputUseCase {
         Ok(())
     }
 
+    /// Returns the current sequence number and advances the counter.
+    ///
+    /// `wrapping_add` prevents panics on overflow: when the counter reaches
+    /// u64::MAX the next call returns 0.  In practice the counter will never
+    /// overflow — at 1 million events per second it would take ~580,000 years.
     fn next_sequence(&mut self) -> u64 {
         let seq = self.sequence;
         self.sequence = self.sequence.wrapping_add(1);

@@ -1,5 +1,30 @@
+/**
+ * Tests for the `useMasterStore` Zustand store.
+ *
+ * # What these tests verify
+ *
+ * - Each action correctly updates its corresponding state slice.
+ * - `updateClientLayout` updates only the matching entry and leaves others unchanged.
+ * - `setLastError(null)` clears a previously set error.
+ * - Initial state values are correct.
+ *
+ * # Test isolation
+ *
+ * The `afterEach` hook resets the store to its initial state after every test
+ * to prevent state from leaking between tests.  Zustand exposes
+ * `useMasterStore.setState(...)` which directly writes state, bypassing actions.
+ * This is the recommended approach for setting up test preconditions.
+ *
+ * # `makeClient` and `makeLayoutEntry` helpers
+ *
+ * These builders produce minimal valid DTOs with a given ID.  Tests that need
+ * specific field values use overrides or build the full object themselves.
+ */
+
 import { useMasterStore } from "../store";
 import type { ClientDto, ClientLayoutDto, NetworkConfigDto } from "../types";
+
+// ── Test isolation ─────────────────────────────────────────────────────────────
 
 // Reset store between tests to avoid state leakage.
 afterEach(() => {
@@ -14,6 +39,9 @@ afterEach(() => {
   });
 });
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/** Builds a minimal `ClientDto` with the given ID. */
 const makeClient = (id: string): ClientDto => ({
   clientId: id,
   name: `client-${id}`,
@@ -22,6 +50,7 @@ const makeClient = (id: string): ClientDto => ({
   eventsPerSecond: 0,
 });
 
+/** Builds a minimal `ClientLayoutDto` for a client at x=1920. */
 const makeLayoutEntry = (id: string): ClientLayoutDto => ({
   clientId: id,
   name: `client-${id}`,
@@ -30,6 +59,8 @@ const makeLayoutEntry = (id: string): ClientLayoutDto => ({
   width: 1920,
   height: 1080,
 });
+
+// ── Tests ──────────────────────────────────────────────────────────────────────
 
 describe("useMasterStore", () => {
   test("setClients replaces the client list", () => {
@@ -63,17 +94,17 @@ describe("useMasterStore", () => {
   });
 
   test("updateClientLayout updates only the matching entry", () => {
-    // Arrange
+    // Arrange — store two layout entries
     const layout = [makeLayoutEntry("a"), makeLayoutEntry("b")];
     useMasterStore.getState().setLayout(layout);
 
     const updated: ClientLayoutDto = { ...makeLayoutEntry("a"), xOffset: 3840 };
 
-    // Act
+    // Act — update only "a"
     useMasterStore.getState().updateClientLayout(updated);
     const state = useMasterStore.getState();
 
-    // Assert
+    // Assert — "a" is updated; "b" is unchanged
     expect(state.layout.find((e) => e.clientId === "a")?.xOffset).toBe(3840);
     expect(state.layout.find((e) => e.clientId === "b")?.xOffset).toBe(1920);
   });
@@ -85,10 +116,10 @@ describe("useMasterStore", () => {
 
     const nonExistent: ClientLayoutDto = { ...makeLayoutEntry("z"), xOffset: 9999 };
 
-    // Act
+    // Act — update a non-existent entry
     useMasterStore.getState().updateClientLayout(nonExistent);
 
-    // Assert – existing entry unchanged
+    // Assert — existing entry is unchanged
     expect(useMasterStore.getState().layout[0].xOffset).toBe(1920);
   });
 
@@ -125,10 +156,10 @@ describe("useMasterStore", () => {
   });
 
   test("setLastError clears the error when null is passed", () => {
-    // Arrange
+    // Arrange — seed an error
     useMasterStore.getState().setLastError("existing error");
 
-    // Act
+    // Act — clear it
     useMasterStore.getState().setLastError(null);
 
     // Assert
