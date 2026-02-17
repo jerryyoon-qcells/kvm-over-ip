@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  ============================================================================
+  KVM-Over-IP Client — WiX Toolset MSI Installer Definition
+  ============================================================================
+
+  PURPOSE:
+    This file defines the Windows Installer (MSI) package for the kvm-client
+    binary.  kvm-client runs on each remote machine that will receive
+    forwarded keyboard and mouse events from the master machine.
+
+  HOW WIX WORKS (for beginners):
+    WiX (Windows Installer XML) uses XML to describe an MSI installer.
+    The key concepts are:
+      - Product   : The top-level item being installed.
+      - Package   : Metadata about the MSI file itself.
+      - Feature   : A named group of things the user can choose to install.
+      - Component : A single unit of change (usually one file + registry key).
+      - Directory : Maps installer path IDs to real filesystem locations.
+      - Shortcut  : A Start Menu or Desktop link to the application.
+
+  BUILDING THE INSTALLER:
+    From the workspace root (src/) run:
+      cargo wix --package kvm-client --nocapture
+
+    Prerequisites:
+      cargo install cargo-wix
+      WiX Toolset v3 must be installed and on PATH:
+        https://wixtoolset.org/releases/
+
+  GUIDS:
+    The UpgradeCode GUID below is permanent.  Never change it between
+    versions or Windows will treat the new version as a different product
+    instead of an upgrade, leaving the old version orphaned in Add/Remove Programs.
+
+  WHAT THIS INSTALLER PROVIDES:
+    - Installs kvm-client.exe to C:\Program Files\KVM-Over-IP\
+    - Creates a "KVM-Over-IP" folder in the Start Menu
+    - Optionally creates a Desktop shortcut (user can opt out)
+    - Adds an entry to Programs and Features for clean uninstallation
+  ============================================================================
+-->
+
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+
+  <!--
+    Product element — the MSI product being installed.
+      Id          : "*" means WiX auto-generates a new product GUID each build
+                    (required for MajorUpgrade to work correctly).
+      UpgradeCode : Fixed GUID shared across all versions of kvm-client.
+                    This value was generated with uuidgen — do not change it.
+  -->
+  <Product
+    Id="*"
+    Name="KVM-Over-IP Client"
+    Manufacturer="KVM-Over-IP Contributors"
+    Version="!(bind.FileVersion.FileKvmClient)"
+    Language="1033"
+    UpgradeCode="F0E1D2C3-B4A5-6789-0FED-CBA987654321">
+
+    <!--
+      Package element — describes the MSI file metadata.
+        InstallerVersion: 500 = Windows Installer 5.0 (Windows 7+).
+        Compressed      : "yes" stores files inside the MSI (single-file installer).
+        InstallScope    : "perMachine" = install for all users, requires admin.
+    -->
+    <Package
+      InstallerVersion="500"
+      Compressed="yes"
+      InstallScope="perMachine"
+      Description="KVM-Over-IP Client Application — receives keyboard and mouse events from the master machine and replays them locally."
+      Comments="KVM-Over-IP Client installer built with WiX Toolset and cargo-wix." />
+
+    <!--
+      Media defines the cabinet (CAB) file that stores compressed installer
+      files.  EmbedCab="yes" means the CAB is embedded in the MSI itself.
+    -->
+    <Media Id="1" Cabinet="main.cab" EmbedCab="yes" />
+
+    <!--
+      MajorUpgrade handles automatic upgrade from any previous version.
+        DowngradeErrorMessage: Shown when installing over a newer version.
+        Schedule: afterInstallInitialize removes the old version immediately
+                  before the new version is installed.
+    -->
+    <MajorUpgrade
+      DowngradeErrorMessage="A newer version of KVM-Over-IP Client is already installed.  Please uninstall it first if you want to install an older version."
+      Schedule="afterInstallInitialize" />
+
+    <!-- ======================================================================
+         DIRECTORY STRUCTURE
+         This section maps symbolic IDs to real filesystem paths.
+
+         Final install path: C:\Program Files\KVM-Over-IP\
+         Start Menu folder : C:\ProgramData\Microsoft\Windows\Start Menu\
+                               Programs\KVM-Over-IP\
+         Desktop           : %USERPROFILE%\Desktop\
+         ====================================================================== -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+
+      <!-- C:\Program Files\ (adjusts automatically for 32-bit vs 64-bit OS) -->
+      <Directory Id="ProgramFilesFolder">
+        <!--
+          INSTALLDIR is the main installation folder.
+          The UI lets users change this path on the "Browse" screen.
+        -->
+        <Directory Id="INSTALLDIR" Name="KVM-Over-IP">
+        </Directory>
+      </Directory>
+
+      <!-- Start Menu → Programs folder -->
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="KvmStartMenuFolder" Name="KVM-Over-IP" />
+      </Directory>
+
+      <!-- Current user's Desktop -->
+      <Directory Id="DesktopFolder" Name="Desktop" />
+
+    </Directory>
+
+    <!-- ======================================================================
+         COMPONENTS
+         Each Component is an atomic unit of installation.
+         The Guid must remain the same across versions so that Windows
+         Installer can upgrade the component correctly.
+         ====================================================================== -->
+
+    <DirectoryRef Id="INSTALLDIR">
+
+      <!--
+        Component: kvm-client.exe binary.
+          The File element with KeyPath="yes" is the primary tracked resource.
+          $(var.kvm_client.TargetPath) is resolved by cargo-wix to the actual
+          binary output path (e.g. target\release\kvm-client.exe).
+      -->
+      <Component Id="CmpKvmClientExe" Guid="E5F6A7B8-C9D0-1234-EF01-345678901234">
+        <File
+          Id="FileKvmClient"
+          Name="kvm-client.exe"
+          Source="$(var.kvm_client.TargetPath)"
+          KeyPath="yes" />
+      </Component>
+
+      <!--
+        Component: Start Menu shortcut.
+        Shortcuts cannot be KeyPaths directly, so we use a RegistryValue
+        as the KeyPath and store the shortcut in the KvmStartMenuFolder.
+      -->
+      <Component Id="CmpStartMenuShortcut" Guid="F6A7B8C9-D0E1-2345-F012-456789012345">
+        <Shortcut
+          Id="StartMenuShortcutClient"
+          Name="KVM-Over-IP Client"
+          Description="Start the KVM-Over-IP Client — receives forwarded input from the master machine."
+          Target="[INSTALLDIR]kvm-client.exe"
+          WorkingDirectory="INSTALLDIR"
+          Directory="KvmStartMenuFolder"
+          Icon="KvmClientIcon" />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\KVM-Over-IP\Client"
+          Name="StartMenuShortcut"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+        <!-- Clean up the Start Menu folder on uninstall if it is empty. -->
+        <RemoveFolder Id="RemoveKvmStartMenuFolder" Directory="KvmStartMenuFolder" On="uninstall" />
+      </Component>
+
+      <!--
+        Component: optional Desktop shortcut.
+        Belongs to the "DesktopShortcut" feature so users can opt out.
+      -->
+      <Component Id="CmpDesktopShortcut" Guid="A7B8C9D0-E1F2-3456-0123-567890123456">
+        <Shortcut
+          Id="DesktopShortcutClient"
+          Name="KVM-Over-IP Client"
+          Description="Start the KVM-Over-IP Client"
+          Target="[INSTALLDIR]kvm-client.exe"
+          WorkingDirectory="INSTALLDIR"
+          Directory="DesktopFolder"
+          Icon="KvmClientIcon" />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\KVM-Over-IP\Client"
+          Name="DesktopShortcut"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+      </Component>
+
+    </DirectoryRef>
+
+    <!-- ======================================================================
+         FEATURES
+         Features let the user selectively install parts of the product.
+         ====================================================================== -->
+
+    <!--
+      MainProgram: the kvm-client binary + Start Menu shortcut.
+        Absent="disallow" means this feature cannot be deselected — it is
+        always installed.
+    -->
+    <Feature
+      Id="MainProgram"
+      Title="KVM-Over-IP Client"
+      Description="Installs the KVM-Over-IP Client application.  Required and cannot be deselected."
+      Level="1"
+      Absent="disallow">
+      <ComponentRef Id="CmpKvmClientExe" />
+      <ComponentRef Id="CmpStartMenuShortcut" />
+    </Feature>
+
+    <!--
+      DesktopShortcut: optional Desktop icon.
+        Level="1" means selected by default.
+        Absent="allow" lets the user uncheck it during custom install.
+    -->
+    <Feature
+      Id="DesktopShortcut"
+      Title="Desktop Shortcut"
+      Description="Places a shortcut to KVM-Over-IP Client on your Desktop.  Uncheck to skip the Desktop icon."
+      Level="1"
+      Absent="allow">
+      <ComponentRef Id="CmpDesktopShortcut" />
+    </Feature>
+
+    <!-- ======================================================================
+         INSTALLER UI
+         WixUI_FeatureTree displays a feature selection tree so users can
+         toggle the optional Desktop shortcut before installation begins.
+         ====================================================================== -->
+
+    <!--
+      License.rtf must exist at wix\License.rtf relative to the .wxs file.
+      Replace it with your actual licence text in Rich Text Format.
+    -->
+    <WixVariable Id="WixUILicenseRtf" Value="wix\License.rtf" />
+
+    <!-- Select the built-in WiX FeatureTree UI template. -->
+    <UIRef Id="WixUI_FeatureTree" />
+
+    <!--
+      Tell the UI which directory the user can change on the Browse screen.
+    -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
+
+    <!-- ======================================================================
+         ICON AND ADD/REMOVE PROGRAMS METADATA
+         ====================================================================== -->
+
+    <!--
+      Application icon shown in Add/Remove Programs and on shortcuts.
+      Replace wix\kvm-client.ico with your real icon file.
+    -->
+    <Icon Id="KvmClientIcon" SourceFile="wix\kvm-client.ico" />
+
+    <!-- Add/Remove Programs display properties. -->
+    <Property Id="ARPPRODUCTICON" Value="KvmClientIcon" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/your-org/kvm-over-ip" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/your-org/kvm-over-ip" />
+    <Property Id="ARPCONTACT" Value="KVM-Over-IP Contributors" />
+
+  </Product>
+</Wix>

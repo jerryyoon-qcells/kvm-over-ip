@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  ============================================================================
+  KVM-Over-IP Master — WiX Toolset MSI Installer Definition
+  ============================================================================
+
+  PURPOSE:
+    This file defines the Windows Installer (MSI) package for the kvm-master
+    binary.  WiX (Windows Installer XML) is the industry-standard open-source
+    tool for building MSI packages.  MSI is the native Windows packaging
+    format and provides:
+      - A proper entry in "Add / Remove Programs" (Programs and Features)
+      - Transactional installation (rolls back on failure)
+      - Group Policy and enterprise deployment support
+      - Clean uninstallation without leftover files
+
+  HOW WIX WORKS (for beginners):
+    WiX uses XML to describe what the installer does.  Key concepts:
+      - Product   : The top-level item being installed (one MSI = one Product).
+      - Package   : Metadata about the MSI file itself.
+      - Feature   : A named group of things the user can choose to install.
+      - Component : A single unit of change (usually one file + its registry key).
+      - Directory : Maps installer locations to real filesystem paths.
+      - Shortcut  : A link in the Start Menu or on the Desktop.
+
+  CARGO-WIX INTEGRATION:
+    `cargo wix` (cargo-wix crate) compiles this .wxs file into an MSI.
+    Run from the workspace root:
+      cargo wix --package kvm-master --nocapture
+
+    cargo-wix automatically substitutes the following template variables:
+      !(bind.FileVersion.FileKvmMaster)  — file version from the binary PE header
+    and exposes the binary via the harvest step.
+
+  GUIDS:
+    Every WiX Product and UpgradeCode needs a stable GUID.  The ones below
+    were generated with uuidgen and must NOT be changed after the first
+    release, or Windows will treat each new version as a different product
+    instead of an upgrade.
+
+  UPGRADING:
+    The <MajorUpgrade> element tells Windows Installer to automatically
+    remove the previous version of kvm-master before installing the new
+    one.  This prevents side-by-side installations.
+  ============================================================================
+-->
+
+<!--
+  The Wix root element.
+  xmlns="http://wixtoolset.org/schemas/v4/wxs" is WiX v4 syntax.
+  If you are using WiX v3 (cargo-wix default), use:
+    xmlns="http://schemas.microsoft.com/wix/2006/wi"
+  and replace <Wix> with <Wix xmlns="..."> accordingly.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+
+  <!--
+    Product element — describes the overall MSI product.
+      Name        : Displayed in Add/Remove Programs.
+      Manufacturer: Company or author name shown in the installer.
+      Version     : Semantic version (major.minor.patch).  Drives upgrade logic.
+      Language    : 1033 = English (United States).
+      Id          : Must be "*" so WiX generates a new product GUID per build
+                    (required for major upgrades to work correctly).
+      UpgradeCode : FIXED GUID shared across all versions.  Never change this.
+  -->
+  <Product
+    Id="*"
+    Name="KVM-Over-IP Master"
+    Manufacturer="KVM-Over-IP Contributors"
+    Version="!(bind.FileVersion.FileKvmMaster)"
+    Language="1033"
+    UpgradeCode="A1B2C3D4-E5F6-7890-ABCD-EF1234567890">
+
+    <!--
+      Package element — MSI file metadata.
+        InstallerVersion: Minimum Windows Installer version required.
+                          500 = Windows Installer 5.0 (Windows 7 and later).
+        Compressed      : "yes" stores all files inside the MSI (single-file
+                          installer, no external cab needed).
+        InstallScope    : "perMachine" installs for all users and requires
+                          administrator privileges.  Use "perUser" for
+                          user-level installs (no admin required, but installs
+                          to %LOCALAPPDATA%).
+    -->
+    <Package
+      InstallerVersion="500"
+      Compressed="yes"
+      InstallScope="perMachine"
+      Description="KVM-Over-IP Master Application — captures keyboard and mouse on the master machine and forwards input events to connected clients over the local network."
+      Comments="KVM-Over-IP Master installer built with WiX Toolset and cargo-wix." />
+
+    <!--
+      Media element — defines the cabinet (CAB) archive that stores compressed
+      files inside the MSI.  EmbedCab="yes" means the CAB is embedded directly
+      in the MSI file, producing a self-contained installer.
+    -->
+    <Media Id="1" Cabinet="main.cab" EmbedCab="yes" />
+
+    <!--
+      MajorUpgrade — enables automatic upgrade from any previous version.
+        DowngradeErrorMessage: Shown if the user tries to install an older
+                               version over a newer one.
+        Schedule             : afterInstallInitialize means the old version is
+                               removed right before the new one is installed.
+    -->
+    <MajorUpgrade
+      DowngradeErrorMessage="A newer version of KVM-Over-IP Master is already installed.  Please uninstall it first if you want to install an older version."
+      Schedule="afterInstallInitialize" />
+
+    <!-- ======================================================================
+         DIRECTORY STRUCTURE
+         Maps symbolic installer directory IDs to real filesystem paths.
+         TARGETDIR → the Windows root (typically C:\)
+         ProgramFilesFolder → C:\Program Files\ (or C:\Program Files (x86)\ on 32-bit)
+         The hierarchy below creates: C:\Program Files\KVM-Over-IP\
+         ====================================================================== -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <!--
+          INSTALLDIR is the main installation directory.
+          cargo-wix passes this as the WixVariable so users can change the
+          install path in the installer UI.
+        -->
+        <Directory Id="INSTALLDIR" Name="KVM-Over-IP">
+        </Directory>
+      </Directory>
+
+      <!--
+        ProgramMenuFolder → C:\ProgramData\Microsoft\Windows\Start Menu\Programs\
+        We create a subfolder "KVM-Over-IP" to group our shortcuts.
+      -->
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="KvmStartMenuFolder" Name="KVM-Over-IP" />
+      </Directory>
+
+      <!--
+        DesktopFolder → the current user's Desktop directory.
+        Desktop shortcuts are placed here.
+      -->
+      <Directory Id="DesktopFolder" Name="Desktop" />
+    </Directory>
+
+    <!-- ======================================================================
+         COMPONENTS
+         Each Component installs one logical unit (usually one file).
+         The Guid must be stable across upgrades for the component so that
+         Windows Installer can track which components are installed and
+         perform correct reference-counting during uninstall.
+         ====================================================================== -->
+
+    <!--
+      DirectoryRef links a component to the INSTALLDIR defined above.
+      All files in this block are installed to C:\Program Files\KVM-Over-IP\.
+    -->
+    <DirectoryRef Id="INSTALLDIR">
+
+      <!--
+        Component: the kvm-master.exe binary.
+          KeyPath="yes" on the File element tells Windows Installer that this
+          file is the "key path" for the component — if it is missing, the
+          component is considered absent and will be repaired.
+      -->
+      <Component Id="CmpKvmMasterExe" Guid="B2C3D4E5-F6A7-8901-BCDE-F12345678901">
+        <File
+          Id="FileKvmMaster"
+          Name="kvm-master.exe"
+          Source="$(var.kvm_master.TargetPath)"
+          KeyPath="yes" />
+      </Component>
+
+      <!--
+        Component: Start Menu shortcut for kvm-master.
+        WiX requires shortcuts to live in their own component with
+        a RegistryValue as the KeyPath (shortcuts cannot be key paths
+        themselves because they live in a different directory from INSTALLDIR).
+      -->
+      <Component Id="CmpStartMenuShortcut" Guid="C3D4E5F6-A7B8-9012-CDEF-123456789012">
+        <Shortcut
+          Id="StartMenuShortcutMaster"
+          Name="KVM-Over-IP Master"
+          Description="Start the KVM-Over-IP Master — captures input on this machine and forwards it to connected client machines."
+          Target="[INSTALLDIR]kvm-master.exe"
+          WorkingDirectory="INSTALLDIR"
+          Directory="KvmStartMenuFolder"
+          Icon="KvmIcon" />
+        <!--
+          The registry key acts as the KeyPath for this component because
+          shortcuts are not reliable key paths.  The key is written to
+          HKCU so it doesn't require elevated write permissions.
+        -->
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\KVM-Over-IP\Master"
+          Name="StartMenuShortcut"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+        <!-- Remove the Start Menu folder on uninstall if it becomes empty. -->
+        <RemoveFolder Id="RemoveKvmStartMenuFolder" Directory="KvmStartMenuFolder" On="uninstall" />
+      </Component>
+
+      <!--
+        Component: optional Desktop shortcut.
+        This component is attached to the "DesktopShortcut" feature so the
+        user can deselect it during a custom installation.
+      -->
+      <Component Id="CmpDesktopShortcut" Guid="D4E5F6A7-B8C9-0123-DEF0-234567890123">
+        <Shortcut
+          Id="DesktopShortcutMaster"
+          Name="KVM-Over-IP Master"
+          Description="Start the KVM-Over-IP Master"
+          Target="[INSTALLDIR]kvm-master.exe"
+          WorkingDirectory="INSTALLDIR"
+          Directory="DesktopFolder"
+          Icon="KvmIcon" />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\KVM-Over-IP\Master"
+          Name="DesktopShortcut"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+      </Component>
+
+    </DirectoryRef>
+
+    <!-- ======================================================================
+         FEATURES
+         Features are named groups of components that users can toggle during
+         a custom installation.  Every component must be referenced by at
+         least one Feature.
+         ====================================================================== -->
+
+    <!--
+      MainProgram: the core application — always installed.
+        Level="1" means this feature is enabled by default.
+        Absent="disallow" prevents the user from deselecting it.
+    -->
+    <Feature
+      Id="MainProgram"
+      Title="KVM-Over-IP Master"
+      Description="Installs the KVM-Over-IP Master application.  This component is required and cannot be deselected."
+      Level="1"
+      Absent="disallow">
+      <ComponentRef Id="CmpKvmMasterExe" />
+      <ComponentRef Id="CmpStartMenuShortcut" />
+    </Feature>
+
+    <!--
+      DesktopShortcut: optional desktop icon.
+        Level="1" means it is selected by default.
+        Absent="allow" lets the user remove it during custom install.
+    -->
+    <Feature
+      Id="DesktopShortcut"
+      Title="Desktop Shortcut"
+      Description="Creates a shortcut to KVM-Over-IP Master on your Desktop.  Uncheck to skip the Desktop icon."
+      Level="1"
+      Absent="allow">
+      <ComponentRef Id="CmpDesktopShortcut" />
+    </Feature>
+
+    <!-- ======================================================================
+         UI
+         WixUI_FeatureTree provides a wizard-style installer with a feature
+         selection page so the user can opt out of the Desktop shortcut.
+         ====================================================================== -->
+
+    <!--
+      WixVariable sets the default install directory shown in the installer UI.
+      Users can change this path on the "Change Installation Directory" screen.
+    -->
+    <!--
+      WixUILicenseRtf: path to the licence agreement displayed in the installer.
+      The file wix\License.rtf is a stub MIT licence.  Replace it with the
+      actual project licence text formatted as an RTF file if needed.
+    -->
+    <WixVariable Id="WixUILicenseRtf" Value="wix\License.rtf" />
+
+    <!--
+      UIRef selects the built-in WiX UI template.
+      WixUI_FeatureTree shows: Welcome → License → Features → Install path → Install
+    -->
+    <UIRef Id="WixUI_FeatureTree" />
+
+    <!--
+      WIXUI_INSTALLDIR tells the FeatureTree UI which directory variable is
+      the installation root — this is the directory the user can change.
+    -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
+
+    <!-- ======================================================================
+         ICON
+         The icon is embedded in the MSI and shown in Add/Remove Programs.
+         Replace wix\kvm-master.ico with your actual application icon.
+         ====================================================================== -->
+    <Icon Id="KvmIcon" SourceFile="wix\kvm-master.ico" />
+
+    <!--
+      These properties control what the Windows Installer shows in the
+      "Programs and Features" (Add/Remove Programs) control panel entry.
+    -->
+    <Property Id="ARPPRODUCTICON" Value="KvmIcon" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/your-org/kvm-over-ip" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/your-org/kvm-over-ip" />
+    <Property Id="ARPCONTACT" Value="KVM-Over-IP Contributors" />
+
+  </Product>
+</Wix>

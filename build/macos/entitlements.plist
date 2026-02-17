@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+
+<!--
+  ============================================================================
+  entitlements.plist — macOS Security Entitlements for KVM-Over-IP Client
+  ============================================================================
+
+  PURPOSE:
+    Entitlements declare what special permissions the application needs
+    from macOS.  Without the correct entitlements, macOS will deny the app
+    access to sensitive APIs even if the user grants permission in System
+    Preferences.
+
+  WHAT ARE ENTITLEMENTS? (for beginners)
+    macOS uses a sandboxing and capability system to restrict what apps can do.
+    An entitlement is a declaration (in this file) that says "this app needs
+    permission X".  The OS checks entitlements during:
+      1. Code signing — the entitlements are embedded in the signed binary.
+      2. Runtime — the OS checks the embedded entitlements before granting
+         access to restricted APIs.
+
+  WHY kvm-client NEEDS ACCESSIBILITY:
+    kvm-client uses CGEvent (CoreGraphics Event) to synthesise keyboard and
+    mouse events at the system level.  This API is classified as "Accessibility"
+    by macOS because it can control the computer programmatically.
+
+    macOS requires TWO things for CGEvent to work:
+      1. The user must grant "Accessibility" permission in:
+           System Preferences → Privacy & Security → Accessibility
+         The first time the app uses CGEvent, macOS prompts for this permission.
+      2. The entitlement com.apple.security.automation.apple-events MAY be
+         needed if the app sends events to other applications.
+
+  SIGNING COMMAND:
+    codesign --deep --force --sign "Developer ID Application: Your Name (TEAMID)" \
+             --entitlements build/macos/entitlements.plist \
+             "KVM-Over-IP Client.app"
+
+  NOTARISATION:
+    For distribution outside the Mac App Store (Gatekeeper clearance):
+      xcrun notarytool submit "KVM-Over-IP Client.dmg" \
+            --apple-id your@email.com \
+            --team-id YOUR_TEAM_ID \
+            --password APP_SPECIFIC_PASSWORD
+      xcrun stapler staple "KVM-Over-IP Client.dmg"
+  ============================================================================
+-->
+
+<plist version="1.0">
+<dict>
+
+  <!-- ========================================================================
+       HARDENED RUNTIME
+       ======================================================================== -->
+
+  <!--
+    com.apple.security.cs.allow-jit:
+    Allow Just-In-Time (JIT) compiled code.  Not needed for a compiled Rust binary,
+    but listed here for documentation completeness.  Leave false unless needed.
+  -->
+  <!-- Not required: <key>com.apple.security.cs.allow-jit</key><false/> -->
+
+  <!--
+    com.apple.security.cs.allow-unsigned-executable-memory:
+    Allow the app to write to and execute unsigned memory pages.
+    Required by some JIT and interpreter runtimes.  Not needed for kvm-client.
+  -->
+  <!-- Not required -->
+
+  <!-- ========================================================================
+       NETWORK ACCESS
+       ======================================================================== -->
+
+  <!--
+    com.apple.security.network.client:
+    Allow the app to make outbound network connections.
+    kvm-client connects to the master machine over TCP, so this is required.
+  -->
+  <key>com.apple.security.network.client</key>
+  <true/>
+
+  <!--
+    com.apple.security.network.server:
+    Allow the app to accept incoming network connections.
+    Only needed if kvm-client listens on a port (e.g., for discovery responses).
+    Enable this if the UDP discovery responder binds to a socket.
+  -->
+  <key>com.apple.security.network.server</key>
+  <true/>
+
+  <!-- ========================================================================
+       ACCESSIBILITY / INPUT INJECTION
+       ======================================================================== -->
+
+  <!--
+    com.apple.security.automation.apple-events:
+    Allow sending Apple Events to other applications.
+    Required when CGEvent is used to post events to OTHER applications
+    (not just the system input stream).  Include this as a precaution since
+    kvm-client posts system-level input events via CGEventPost(kCGSessionEventTap).
+  -->
+  <key>com.apple.security.automation.apple-events</key>
+  <true/>
+
+  <!--
+    IMPORTANT — ACCESSIBILITY PERMISSION IS NOT AN ENTITLEMENT:
+    The actual "Accessibility" permission that allows CGEvent to inject input
+    at the system level is NOT declared here as an entitlement.  Instead, it
+    is a runtime permission that the user must grant interactively:
+      System Preferences → Privacy & Security → Accessibility → add kvm-client
+
+    When the app first calls CGEventPost() or AXIsProcessTrusted(), macOS
+    shows a dialog asking the user to grant Accessibility access.  The user
+    must click the allow button (or add it manually in System Preferences).
+
+    In CI/automated builds, this dialog cannot be dismissed programmatically.
+    On headless/server macOS, input injection may not work at all.
+  -->
+
+  <!-- ========================================================================
+       SANDBOX (DISABLED FOR INPUT INJECTION)
+       ======================================================================== -->
+
+  <!--
+    com.apple.security.app-sandbox:
+    The App Sandbox restricts what resources an app can access.
+    It MUST be set to false for kvm-client because sandboxed apps cannot:
+      - Inject system-level input events via CGEvent
+      - Make arbitrary network connections to user-specified hosts
+      - Access peripherals without additional entitlements
+
+    Note: Mac App Store submissions REQUIRE sandbox=true.
+    kvm-client is distributed outside the Mac App Store (direct download / DMG)
+    so sandbox is disabled here.
+  -->
+  <key>com.apple.security.app-sandbox</key>
+  <false/>
+
+</dict>
+</plist>

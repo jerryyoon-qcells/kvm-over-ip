@@ -1,0 +1,104 @@
+# =============================================================================
+# kvm-web-bridge.service — systemd Service Unit for KVM-Over-IP WebSocket Bridge
+# =============================================================================
+#
+# PURPOSE:
+#   Runs kvm-web-bridge as a SYSTEM service (not a user service).
+#   The WebSocket bridge is a network daemon that does not require access to
+#   a graphical display, so running it as a system service (under a dedicated
+#   unprivileged user) is the correct and secure approach.
+#
+# WHAT kvm-web-bridge DOES:
+#   kvm-web-bridge listens for WebSocket connections from web browsers and
+#   proxies them to the native kvm-master TCP socket.  This allows browser-
+#   based KVM clients to control remote machines without installing native
+#   software.
+#
+# SECURITY MODEL:
+#   The service runs as the `kvm-bridge` system user (created by postinst).
+#   This user has no login shell and no home directory, limiting the blast
+#   radius of any vulnerability in the bridge code.
+#
+# MANUAL MANAGEMENT:
+#   Start now:       sudo systemctl start kvm-web-bridge
+#   Stop:            sudo systemctl stop kvm-web-bridge
+#   Status:          sudo systemctl status kvm-web-bridge
+#   Logs:            sudo journalctl -u kvm-web-bridge -f
+#   Enable on boot:  sudo systemctl enable kvm-web-bridge
+#   Disable on boot: sudo systemctl disable kvm-web-bridge
+#
+# CONFIGURATION:
+#   Default ports:
+#     --ws-port 9001      : WebSocket port (browser connects here)
+#     --master-port 5001  : TCP port kvm-master listens on
+#   Override by editing /etc/default/kvm-web-bridge:
+#     KVM_BRIDGE_ARGS="--ws-port 9001 --master-host 192.168.1.10 --master-port 5001"
+# =============================================================================
+
+[Unit]
+Description=KVM-Over-IP WebSocket Bridge — proxy WebSocket connections to KVM master
+Documentation=https://github.com/your-org/kvm-over-ip
+
+# Start after the network is fully up with an assigned IP address.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Type=simple: the ExecStart command IS the service process.
+Type=simple
+
+# Run as a dedicated unprivileged system user for security isolation.
+# The postinst script creates this user with:
+#   useradd --system --no-create-home --shell /usr/sbin/nologin kvm-bridge
+User=kvm-bridge
+Group=kvm-bridge
+
+# The command to run.
+# $KVM_BRIDGE_ARGS is loaded from /etc/default/kvm-web-bridge.
+# If the file does not exist, EnvironmentFile= is silently ignored (the - prefix).
+EnvironmentFile=-/etc/default/kvm-web-bridge
+ExecStart=/usr/bin/kvm-web-bridge $KVM_BRIDGE_ARGS
+
+# Log level control.
+Environment=RUST_LOG=info
+
+# Restart on crash but not on clean exit.
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# Security hardening directives.
+# These restrict what the service process can do on the system.
+
+# Prevent the process from gaining new privileges via setuid/setgid binaries.
+NoNewPrivileges=true
+
+# Mount the entire filesystem as read-only except for /tmp and /var/tmp.
+ProtectSystem=strict
+
+# Hide /home, /root, and /run/user from the service.
+ProtectHome=true
+
+# Give the service its own /tmp namespace (isolated from other processes).
+PrivateTmp=true
+
+# Prevent writing to kernel tunable parameters.
+ProtectKernelTunables=true
+
+# Prevent loading kernel modules.
+ProtectKernelModules=true
+
+# Restrict available system calls to those typically needed by a network service.
+# "~" means "deny these syscall groups".  This denies dangerous syscalls like
+# mount, reboot, and kernel module operations.
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kvm-web-bridge
+
+[Install]
+# Enable automatic start at boot.
+WantedBy=multi-user.target

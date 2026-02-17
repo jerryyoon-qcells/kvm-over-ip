@@ -1,0 +1,101 @@
+#!/bin/sh
+# =============================================================================
+# postinst — Debian Post-Installation Script for kvm-web-bridge
+# =============================================================================
+#
+# PURPOSE:
+#   After dpkg extracts the package files, this script:
+#     1. Creates a dedicated system user "kvm-bridge" to run the service
+#        securely under a non-root, non-login account.
+#     2. Installs the systemd service unit.
+#     3. Enables and starts the service.
+#
+# WHY A DEDICATED USER? (for beginners)
+#   Running a network-facing daemon as root is a security risk — if the
+#   program has a bug that allows an attacker to run commands, they would
+#   run as root with full system access.
+#   A system user (like kvm-bridge) has:
+#     - No interactive login (--shell /usr/sbin/nologin)
+#     - No home directory (--no-create-home)
+#     - Restricted file system access
+#   This limits the damage an attacker could do even if they exploit a bug.
+#
+# CONFIGURATION FILE:
+#   We create /etc/default/kvm-web-bridge if it doesn't exist yet.
+#   This file holds command-line flags for the service.  Admins edit
+#   this file to configure ports and the master host address.
+# =============================================================================
+
+set -e
+
+case "$1" in
+    configure)
+        # ------------------------------------------------------------------
+        # Step 1: Create the kvm-bridge system user if it doesn't exist.
+        # ------------------------------------------------------------------
+        if ! id -u kvm-bridge >/dev/null 2>&1; then
+            useradd \
+                --system \
+                --no-create-home \
+                --shell /usr/sbin/nologin \
+                --comment "KVM-Over-IP WebSocket Bridge daemon" \
+                kvm-bridge
+            echo "Created system user: kvm-bridge"
+        fi
+
+        # ------------------------------------------------------------------
+        # Step 2: Create the default configuration file if absent.
+        # We use `install -m 640` to set permissions so only root and the
+        # kvm-bridge group can read the config (in case it contains secrets).
+        # ------------------------------------------------------------------
+        if [ ! -f /etc/default/kvm-web-bridge ]; then
+            install -m 640 -o root -g kvm-bridge /dev/null /etc/default/kvm-web-bridge
+            cat > /etc/default/kvm-web-bridge << 'EOF'
+# =============================================================================
+# /etc/default/kvm-web-bridge — Configuration for the KVM-Over-IP WebSocket Bridge
+# =============================================================================
+#
+# Edit this file to configure kvm-web-bridge.
+# After editing, restart the service with:
+#   sudo systemctl restart kvm-web-bridge
+#
+# Available options (run `kvm-web-bridge --help` for the full list):
+#   --ws-port <PORT>       WebSocket port for browser clients (default: 9001)
+#   --master-host <HOST>   Hostname or IP of the kvm-master machine (default: 127.0.0.1)
+#   --master-port <PORT>   TCP port kvm-master listens on (default: 5001)
+# =============================================================================
+
+# Command-line arguments passed to kvm-web-bridge.
+# Example: "--ws-port 9001 --master-host 192.168.1.10 --master-port 5001"
+KVM_BRIDGE_ARGS="--ws-port 9001 --master-host 127.0.0.1 --master-port 5001"
+EOF
+            echo "Created default configuration: /etc/default/kvm-web-bridge"
+        fi
+
+        # ------------------------------------------------------------------
+        # Step 3: Reload systemd and enable + start the service.
+        # ------------------------------------------------------------------
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl daemon-reload || true
+            systemctl enable kvm-web-bridge.service || true
+            systemctl start kvm-web-bridge.service || true
+            echo "KVM-Over-IP WebSocket Bridge service enabled and started."
+            echo ""
+            echo "Check status:  sudo systemctl status kvm-web-bridge"
+            echo "View logs:     sudo journalctl -u kvm-web-bridge -f"
+            echo "Configuration: /etc/default/kvm-web-bridge"
+        else
+            echo "systemd not found — start the bridge manually with:"
+            echo "  /usr/bin/kvm-web-bridge --ws-port 9001 --master-host 127.0.0.1"
+        fi
+        ;;
+
+    abort-upgrade|abort-deconfigure)
+        ;;
+
+    *)
+        echo "postinst called with unknown argument: '$1'" >&2
+        ;;
+esac
+
+exit 0

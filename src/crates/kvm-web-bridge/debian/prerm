@@ -1,0 +1,45 @@
+#!/bin/sh
+# =============================================================================
+# prerm — Debian Pre-Removal Script for kvm-web-bridge
+# =============================================================================
+#
+# PURPOSE:
+#   Stops and disables the kvm-web-bridge systemd service before dpkg
+#   removes the binary.  This prevents systemd from trying to restart a
+#   service whose executable no longer exists on disk.
+#
+# NOTE ON THE SYSTEM USER:
+#   We do NOT delete the kvm-bridge system user in prerm or postrm.
+#   Deleting system users can cause file ownership issues if the admin has
+#   stored logs or configuration owned by that user.  If the admin wants
+#   to remove the user, they can do so manually after purging the package:
+#     sudo userdel kvm-bridge
+# =============================================================================
+
+set -e
+
+case "$1" in
+    remove|purge)
+        if command -v systemctl >/dev/null 2>&1; then
+            # Stop the service and disable it so it does not start at next boot.
+            # `|| true` prevents the script from failing if the service is
+            # already stopped or was never enabled.
+            systemctl disable --now kvm-web-bridge.service 2>/dev/null || true
+            echo "KVM-Over-IP WebSocket Bridge service stopped and disabled."
+        fi
+        ;;
+
+    upgrade|deconfigure)
+        # During upgrade, leave the service running.
+        # The new version's postinst will handle the restart.
+        ;;
+
+    failed-upgrade)
+        ;;
+
+    *)
+        echo "prerm called with unknown argument: '$1'" >&2
+        ;;
+esac
+
+exit 0

@@ -1,0 +1,56 @@
+#!/bin/sh
+# =============================================================================
+# prerm — Debian Pre-Removal Script for kvm-client
+# =============================================================================
+#
+# PURPOSE:
+#   This script is executed by dpkg BEFORE the package files are removed
+#   from the system.  It stops running services and disables them so that
+#   systemd does not try to start a service whose binary has been deleted.
+#
+# WHAT IS A prerm SCRIPT? (for beginners)
+#   When you run `apt remove kvm-client`, dpkg:
+#     1. Runs this "prerm" (pre-removal) script.
+#     2. Deletes the installed files.
+#     3. Runs the "postrm" (post-removal) script.
+#   We stop the service here (in prerm) so that it is cleanly shut down
+#   before its binary is deleted in step 2.
+#
+# ARGUMENT $1:
+#   Debian passes the removal action as the first argument:
+#     remove   — normal package removal (`apt remove`)
+#     upgrade  — package is being upgraded (new version being installed)
+#     purge    — package and config files are being removed (`apt purge`)
+#   We stop the service for "remove" and "purge" but not "upgrade", because
+#   during an upgrade the new postinst will restart the service.
+# =============================================================================
+
+set -e
+
+case "$1" in
+    remove|purge)
+        # Stop and disable the systemd user service before removing files.
+        if command -v systemctl >/dev/null 2>&1; then
+            # --global disables the service for all users (not just root's session).
+            # The `|| true` suffix prevents this script from failing if the
+            # service was never enabled or is already stopped.
+            systemctl --global disable --now kvm-client.service 2>/dev/null || true
+            echo "KVM-Over-IP Client service stopped and disabled."
+        fi
+        ;;
+
+    upgrade|deconfigure)
+        # During upgrade, leave the service running — the new version's
+        # postinst will handle any required service restart.
+        ;;
+
+    failed-upgrade)
+        # Nothing to do if an upgrade failed — the old version remains.
+        ;;
+
+    *)
+        echo "prerm called with unknown argument: '$1'" >&2
+        ;;
+esac
+
+exit 0

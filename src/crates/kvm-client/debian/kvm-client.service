@@ -1,0 +1,107 @@
+# =============================================================================
+# kvm-client.service — systemd Service Unit for KVM-Over-IP Client
+# =============================================================================
+#
+# PURPOSE:
+#   This file tells systemd how to run kvm-client automatically when the
+#   user logs in, and how to stop it cleanly when they log out.
+#
+# WHAT IS SYSTEMD? (for beginners)
+#   systemd is the service manager for modern Linux distributions.  It starts
+#   processes at boot time or when triggered by events (like user login).
+#   A "service unit" file tells systemd:
+#     - What command to run
+#     - When to start it (After=, WantedBy=)
+#     - How to restart it if it crashes (Restart=)
+#     - What environment variables it needs
+#
+# SERVICE TYPE — USER UNIT vs SYSTEM UNIT:
+#   This is a USER unit (installed to ~/.config/systemd/user/ or
+#   /usr/lib/systemd/user/).  It runs as the logged-in user, NOT as root.
+#   This is intentional: kvm-client needs access to the user's display
+#   (DISPLAY, WAYLAND_DISPLAY, XAUTHORITY) to inject input events.
+#   A system unit running as root cannot access user display sessions easily.
+#
+# INSTALLATION:
+#   The postinst script enables this unit for new users with:
+#     systemctl --user enable kvm-client.service
+#
+# MANUAL MANAGEMENT:
+#   Start now:   systemctl --user start kvm-client
+#   Stop:        systemctl --user stop kvm-client
+#   Status:      systemctl --user status kvm-client
+#   Logs:        journalctl --user -u kvm-client -f
+#   Enable auto-start: systemctl --user enable kvm-client
+#   Disable auto-start: systemctl --user disable kvm-client
+#
+# DISPLAY ENVIRONMENT:
+#   For the client to inject X11 input events, the DISPLAY variable must be
+#   set.  The "graphical-session.target" dependency ensures systemd waits
+#   for the desktop session to be ready before starting kvm-client.
+# =============================================================================
+
+[Unit]
+# Human-readable name shown in `systemctl status` output.
+Description=KVM-Over-IP Client — receives forwarded keyboard/mouse input over LAN
+
+# Documentation URL shown in `systemctl status` output.
+Documentation=https://github.com/your-org/kvm-over-ip
+
+# Start kvm-client only after the network is available.
+# network-online.target waits for at least one network interface to be up
+# and have an IP address (stronger guarantee than network.target).
+After=network-online.target
+
+# Also wait for the user's graphical session to be ready.
+# This ensures DISPLAY and XAUTHORITY are available for X11 input injection.
+After=graphical-session.target
+
+# Declare that we want the network to be online when we start.
+Wants=network-online.target
+
+[Service]
+# Type=simple means the ExecStart process IS the service process.
+# systemd considers the service started as soon as the process is running.
+Type=simple
+
+# The command to execute.
+# Adjust --master-host to the IP or hostname of your master machine.
+# You can override this per-user by creating a drop-in:
+#   mkdir -p ~/.config/systemd/user/kvm-client.service.d/
+#   echo "[Service]" > ~/.config/systemd/user/kvm-client.service.d/override.conf
+#   echo "ExecStart=" >> ... (clear the default)
+#   echo "ExecStart=/usr/bin/kvm-client --master-host 192.168.1.100" >> ...
+ExecStart=/usr/bin/kvm-client
+
+# Environment variables.
+# RUST_LOG controls the log level for the tracing-subscriber crate.
+# Valid levels (from most to least verbose): trace, debug, info, warn, error
+Environment=RUST_LOG=info
+
+# Restart the service automatically if it crashes (exits with a non-zero code).
+# "on-failure" means restart on crash but NOT on a clean exit (exit code 0).
+Restart=on-failure
+
+# Wait 5 seconds between restart attempts to avoid rapid crash loops.
+RestartSec=5s
+
+# Limit the number of restart attempts within a 60-second window.
+# If the service crashes more than 5 times in 60 seconds, systemd stops
+# trying to restart it and marks it as "failed".
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# Standard output and error are sent to the systemd journal.
+# View with: journalctl --user -u kvm-client -f
+StandardOutput=journal
+StandardError=journal
+
+# Add the unit name as a tag in journal entries for easier filtering.
+SyslogIdentifier=kvm-client
+
+[Install]
+# WantedBy=default.target means this service starts automatically when the
+# user logs in (i.e., when the user's default systemd target is reached).
+# This is the user-service equivalent of WantedBy=multi-user.target for
+# system services.
+WantedBy=default.target

@@ -1,0 +1,84 @@
+#!/bin/sh
+# =============================================================================
+# postinst — Debian Post-Installation Script for kvm-client
+# =============================================================================
+#
+# PURPOSE:
+#   This script is executed by the Debian package manager (dpkg/apt) after
+#   the package files have been copied to the system.  It performs any setup
+#   that cannot be done by simply copying files.
+#
+# WHAT IS A postinst SCRIPT? (for beginners)
+#   When you install a .deb package with `apt install kvm-client`, dpkg:
+#     1. Extracts all files from the package to their destinations.
+#     2. Runs the "postinst" (post-installation) script.
+#   This script can enable services, set permissions, create users, etc.
+#
+# SYSTEMD USER SERVICE:
+#   kvm-client uses a systemd USER service (not a system service).
+#   User services run as the logged-in user, not as root.
+#   The service file is installed to /usr/lib/systemd/user/ so that every
+#   user on the system can enable it independently with:
+#     systemctl --user enable kvm-client
+#
+# ERROR HANDLING:
+#   `set -e` causes the script to exit immediately if any command fails.
+#   This ensures the package is not left in a partially-configured state.
+#   dpkg will mark the package as "half-configured" and ask the user to
+#   correct the issue if this script exits with a non-zero status.
+#
+# ARGUMENT $1:
+#   Debian passes the installation action as the first argument:
+#     configure        — first install or upgrade
+#     abort-upgrade    — upgrade failed, reverting to old version
+#     abort-deconfigure — deconfiguration failed
+#   We only act on "configure" to avoid double-setup during rollback.
+# =============================================================================
+
+# Exit immediately if any command fails (strict error mode).
+set -e
+
+case "$1" in
+    configure)
+        # ------------------------------------------------------------------
+        # Install the systemd user service file.
+        # The service file was placed in /usr/lib/systemd/user/ by the
+        # package (see assets in Cargo.toml).  We reload the systemd daemon
+        # so it becomes aware of the new unit file.
+        # ------------------------------------------------------------------
+
+        # Check that systemctl is available before trying to use it.
+        # On minimal servers or containers, systemd may not be running.
+        if command -v systemctl >/dev/null 2>&1; then
+            # Reload user systemd daemon state.
+            # --global applies the reload to all user sessions (not just root).
+            # This is necessary because we cannot run `systemctl --user` as
+            # root (it would target root's session, not the installing user's).
+            systemctl --global daemon-reload || true
+
+            echo "KVM-Over-IP Client installed."
+            echo ""
+            echo "To enable automatic start on login, run as your user:"
+            echo "  systemctl --user enable kvm-client"
+            echo "  systemctl --user start kvm-client"
+            echo ""
+            echo "To view logs:"
+            echo "  journalctl --user -u kvm-client -f"
+        else
+            echo "systemd not found — skipping service registration."
+            echo "Start kvm-client manually with: /usr/bin/kvm-client"
+        fi
+        ;;
+
+    abort-upgrade|abort-deconfigure)
+        # Nothing to do during rollback — the old package will restore itself.
+        ;;
+
+    *)
+        # Unknown action — print a warning but do not fail.
+        echo "postinst called with unknown argument: '$1'" >&2
+        ;;
+esac
+
+# The script must exit 0 for the installation to be considered successful.
+exit 0

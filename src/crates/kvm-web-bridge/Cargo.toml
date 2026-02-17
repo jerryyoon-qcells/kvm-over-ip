@@ -6,6 +6,39 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
+homepage = "https://github.com/your-org/kvm-over-ip"
+repository = "https://github.com/your-org/kvm-over-ip"
+
+# ---------------------------------------------------------------------------
+# cargo-deb: Debian/Ubuntu .deb package metadata (Linux packaging only)
+# Run `cargo deb --package kvm-web-bridge` to build the .deb package.
+# See: https://github.com/kornelski/cargo-deb
+# ---------------------------------------------------------------------------
+[package.metadata.deb]
+summary = "KVM-Over-IP WebSocket bridge — browser-accessible KVM relay"
+extended-description = """\
+KVM-Over-IP WebSocket Bridge translates between the binary KVM-Over-IP
+protocol used by the native master/client binaries and a JSON-over-WebSocket
+protocol understood by web browsers.
+.
+Run this service alongside kvm-master to enable browser-based KVM access
+without installing any native client software on the viewer machine.
+"""
+section = "net"
+priority = "optional"
+# libc6 is the only hard runtime dependency; the bridge is a pure network service
+depends = "$auto, libc6 (>= 2.35)"
+assets = [
+    # Main binary → /usr/bin/ so it is on PATH for all users.
+    # Path is relative to the crate directory (src/crates/kvm-web-bridge/).
+    # The workspace target is at src/target/, so we go up two levels.
+    ["../../target/release/kvm-web-bridge", "usr/bin/kvm-web-bridge", "755"],
+    # systemd service unit → /lib/systemd/system/ (standard system service location)
+    # cargo-deb copies this file so dpkg can deploy it; postinst runs systemctl enable.
+    ["debian/kvm-web-bridge.service", "lib/systemd/system/kvm-web-bridge.service", "644"],
+]
+# Post-install and pre-remove scripts to manage the systemd service and system user
+maintainer-scripts = "debian/"
 
 [[bin]]
 name = "kvm-web-bridge"

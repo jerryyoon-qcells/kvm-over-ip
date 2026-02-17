@@ -6,6 +6,84 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
+homepage = "https://github.com/your-org/kvm-over-ip"
+repository = "https://github.com/your-org/kvm-over-ip"
+
+# ---------------------------------------------------------------------------
+# cargo-wix: Windows MSI installer metadata (Windows packaging only)
+# Run `cargo wix --package kvm-client` to build the MSI.
+# See: https://github.com/volks73/cargo-wix
+# ---------------------------------------------------------------------------
+[package.metadata.wix]
+wxs = "wix/main.wxs"
+
+# ---------------------------------------------------------------------------
+# cargo-deb: Debian/Ubuntu .deb package metadata (Linux packaging only)
+# Run `cargo deb --package kvm-client` to build the .deb package.
+# See: https://github.com/kornelski/cargo-deb
+# ---------------------------------------------------------------------------
+[package.metadata.deb]
+# Short one-line summary shown in `apt show kvm-client`
+summary = "KVM-Over-IP client — receive forwarded keyboard/mouse events over LAN"
+# Multi-line description (the first line is the synopsis; the rest is the long description)
+extended-description = """\
+KVM-Over-IP Client receives keyboard and mouse events forwarded by the
+KVM-Over-IP Master running on another machine on the same local network.
+It replays the events as real system input so the remote machine behaves
+as if a physical keyboard and mouse were connected to it.
+.
+Supports automatic discovery of the master machine via UDP broadcast.
+"""
+# Debian section — "net" is the appropriate section for network utilities
+section = "net"
+# Package priority — "optional" means it is not required by the base system
+priority = "optional"
+# Runtime library dependencies (verified on Ubuntu 22.04 LTS)
+# libx11-6   : X11 client library (display connection)
+# libxtst6   : XTest extension library (synthetic input injection)
+# libc6      : GNU C library (required by all native binaries)
+depends = "$auto, libx11-6 (>= 2:1.7), libxtst6 (>= 2:1.2), libc6 (>= 2.35)"
+# Files to install: (source_path, destination_path_inside_package)
+assets = [
+    # Main binary → /usr/bin/ so it is on PATH for all users.
+    # Path is relative to the crate directory (src/crates/kvm-client/).
+    # The workspace target directory is at src/target/, so the relative path
+    # from the crate goes up two levels: ../../target/release/kvm-client
+    ["../../target/release/kvm-client", "usr/bin/kvm-client", "755"],
+    # Desktop entry → /usr/share/applications/ for GUI launchers (GNOME, KDE, etc.)
+    # Path is relative to the crate directory.
+    ["debian/kvm-client.desktop", "usr/share/applications/kvm-client.desktop", "644"],
+    # systemd USER service unit → /usr/lib/systemd/user/ (per-user service location)
+    # Users enable this with: systemctl --user enable kvm-client
+    ["debian/kvm-client.service", "usr/lib/systemd/user/kvm-client.service", "644"],
+    # Man page placeholder (add docs/kvm-client.1 if a man page exists)
+    # ["../../docs/kvm-client.1", "usr/share/man/man1/kvm-client.1.gz", "644"],
+]
+# Post-install and pre-remove scripts for user notification and service hints
+maintainer-scripts = "debian/"
+
+# ---------------------------------------------------------------------------
+# cargo-bundle: macOS .app bundle metadata (macOS packaging only)
+# Run `cargo bundle --release --package kvm-client` to build the .app bundle.
+# See: https://github.com/burtonageo/cargo-bundle
+# The DMG is then created by build/macos/create-dmg.sh.
+# ---------------------------------------------------------------------------
+[package.metadata.bundle]
+# Application name (appears in Finder and Dock)
+name = "KVM-Over-IP Client"
+# Reverse-DNS bundle identifier (must match entitlements.plist)
+identifier = "com.your-org.kvm-over-ip.client"
+# Icon file (relative to crate root; .icns on macOS)
+# Generate AppIcon.icns from build/macos/AppIcon.svg using instructions in that file.
+icon = ["../../build/macos/AppIcon.icns"]
+# Short description shown in Finder Get Info panel
+short_description = "Receive forwarded keyboard and mouse input from a KVM-Over-IP Master"
+# Copyright shown in About box
+copyright = "Copyright © 2024 KVM-Over-IP Contributors. MIT License."
+# Minimum macOS version (12.0 = Monterey)
+osx_minimum_system_version = "12.0"
+# App category for Spotlight and Launchpad
+category = "public.app-category.utilities"
 
 [lib]
 name = "kvm_client"

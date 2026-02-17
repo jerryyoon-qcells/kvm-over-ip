@@ -1,12 +1,12 @@
 # =============================================================================
-# Release Workflow: kvm-over-ip Binary Release
+# Release Workflow: kvm-over-ip Binary Release and Installer Packages
 # =============================================================================
 #
 # PURPOSE:
 #   This workflow fires when a version tag (e.g., v1.2.3) is pushed to the
-#   repository. It builds release-optimised binaries for Windows, Linux, and
-#   macOS, then creates a GitHub Release and attaches the binaries as
-#   downloadable assets.
+#   repository.  It builds release-optimised binaries and installer packages
+#   for Windows, Linux, and macOS, then creates a GitHub Release and attaches
+#   all artefacts as downloadable assets.
 #
 # HOW TO TRIGGER A RELEASE:
 #   From your local machine:
@@ -21,18 +21,29 @@
 #     - codegen-units = 1 (allows more cross-function optimisation)
 #     - strip = true  (removes debug symbols to reduce file size)
 #
-# BINARY TARGETS:
-#   Platform     Binary name              Notes
-#   ----------   -----------------------  ----------------------------------------
-#   Windows      kvm-master.exe           Uses Win32 hooks (Windows-only crate)
-#                kvm-client.exe
-#                kvm-web-bridge.exe
-#   Linux        kvm-master               kvm-master omits Windows hook code
-#                kvm-client               Requires libX11 and libXtst at runtime
-#                kvm-web-bridge
-#   macOS        kvm-master               kvm-master omits Windows hook code
-#                kvm-client               Uses CoreGraphics (built-in macOS SDK)
-#                kvm-web-bridge
+# BINARY AND INSTALLER TARGETS:
+#   Platform     Binary                  Installer
+#   ----------   ----------------------  -----------------------------------------
+#   Windows      kvm-master.exe          kvm-master-<ver>.msi  (cargo-wix)
+#                kvm-client.exe          kvm-client-<ver>.msi  (cargo-wix)
+#                kvm-web-bridge.exe      (raw binary only)
+#   Linux        kvm-client              kvm-client-<ver>-amd64.deb  (cargo-deb)
+#                kvm-web-bridge          kvm-web-bridge-<ver>-amd64.deb (cargo-deb)
+#   macOS        kvm-client              KVM-Over-IP-Client-<ver>.dmg (cargo-bundle)
+#                kvm-web-bridge          (raw binary only)
+#
+# INSTALLER TOOLS:
+#   cargo-wix   : Wraps WiX Toolset to build MSI packages on Windows.
+#                 Reads [package.metadata.wix] from Cargo.toml.
+#                 https://github.com/volks73/cargo-wix
+#
+#   cargo-deb   : Builds Debian .deb packages on Linux.
+#                 Reads [package.metadata.deb] from Cargo.toml.
+#                 https://github.com/kornelski/cargo-deb
+#
+#   cargo-bundle: Builds macOS .app bundles and other platform packages.
+#                 Reads [package.metadata.bundle] from Cargo.toml.
+#                 https://github.com/burtonageo/cargo-bundle
 #
 # CHANGELOG GENERATION:
 #   The `softprops/action-gh-release` action automatically collects commit
@@ -40,8 +51,16 @@
 #
 # PERMISSIONS:
 #   The workflow needs `contents: write` to create the GitHub Release and
-#   upload the binary assets. The default `GITHUB_TOKEN` is used; no
-#   additional secrets are required.
+#   upload the binary assets.  The default `GITHUB_TOKEN` is used; no
+#   additional secrets are required for unsigned builds.
+#
+# CODE SIGNING:
+#   This workflow does NOT perform code signing.  To add code signing:
+#     Windows: Store the PFX certificate as a GitHub Secret and pass
+#              `-p` / `-k` flags to `cargo wix` or `signtool`.
+#     macOS:   Store the Developer ID certificate in a GitHub Secret,
+#              import it into a keychain, then pass `--sign` to codesign.
+#   See docs/PACKAGING.md for detailed signing instructions.
 
 name: Release
 
@@ -49,15 +68,12 @@ name: Release
 # TRIGGERS
 # ---------------------------------------------------------------------------
 # Only activate when a tag matching `v*.*.*` is pushed (semantic versioning).
-# This prevents the release workflow from running on branch pushes or PRs.
-# ---------------------------------------------------------------------------
 on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
-# Grant the built-in GITHUB_TOKEN permission to create releases and upload
-# release assets. Without this, the upload step would receive a 403 error.
+# Grant the built-in GITHUB_TOKEN permission to create releases and upload assets.
 permissions:
   contents: write
 
@@ -72,41 +88,15 @@ defaults:
 jobs:
 
   # ---------------------------------------------------------------------------
-  # JOB: build-release-binaries
+  # JOB: build-windows
   # ---------------------------------------------------------------------------
-  # Compiles and packages release binaries for all three target platforms in
-  # parallel. The matrix produces three independent jobs:
-  #   - ubuntu-latest  → Linux x86-64 binaries
-  #   - windows-latest → Windows x86-64 .exe binaries
-  #   - macos-latest   → macOS arm64/x86-64 binaries (depends on runner image)
+  # Compiles Windows binaries and builds MSI installers for kvm-master and
+  # kvm-client using cargo-wix.  The job also produces a raw binary ZIP
+  # archive for users who prefer not to use the MSI installer.
   # ---------------------------------------------------------------------------
-  build-release-binaries:
-    name: Build Release – ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # --- Linux ---
-          # archive_ext: the file extension used for the uploaded archive.
-          # binary_suffix: empty on Unix, ".exe" on Windows.
-          - os: ubuntu-latest
-            target_name: linux-x86_64
-            archive_ext: tar.gz
-            binary_suffix: ''
-
-          # --- Windows ---
-          - os: windows-latest
-            target_name: windows-x86_64
-            archive_ext: zip
-            binary_suffix: .exe
-
-          # --- macOS ---
-          - os: macos-latest
-            target_name: macos-aarch64
-            archive_ext: tar.gz
-            binary_suffix: ''
+  build-windows:
+    name: Build Windows — binaries + MSI installers
+    runs-on: windows-latest
 
     steps:
       # Step 1: Check out the code at the tagged commit.
@@ -114,24 +104,10 @@ jobs:
         uses: actions/checkout@v4
 
       # Step 2: Install the Rust stable toolchain.
-      #   We use the same stable toolchain as CI to ensure consistency between
-      #   CI test results and release binaries.
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      # Step 3 (Linux only): Install X11/XTest system libraries.
-      #   The kvm-client Linux backend links against libX11 and libXtst.
-      #   These system packages must be present for the linker to succeed.
-      - name: Install Linux system dependencies (Ubuntu only)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            libx11-dev \
-            libxtst-dev
-
-      # Step 4: Restore the Cargo registry cache.
-      #   This prevents downloading all dependency crates on every release run.
+      # Step 3: Restore the Cargo registry cache to speed up dependency downloads.
       - name: Cache Cargo registry
         uses: actions/cache@v4
         with:
@@ -139,113 +115,382 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('src/**/Cargo.lock', 'src/Cargo.toml') }}
+          key: windows-cargo-registry-${{ hashFiles('src/**/Cargo.lock', 'src/Cargo.toml') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+            windows-cargo-registry-
 
-      # Step 5: Build all crates in release mode.
-      #   `--release` selects the `[profile.release]` section from Cargo.toml.
-      #   `--workspace` builds every crate: kvm-core, kvm-master, kvm-client,
-      #   kvm-web-bridge.
-      #   Platform-gated code (Windows hooks, X11 calls, CoreGraphics calls)
-      #   is automatically included or excluded by the Rust compiler based on
-      #   the host/target OS.
-      - name: cargo build --release --workspace
+      # Step 4: Build all crates in release mode.
+      #   Platform-gated code (Win32 hooks) is included automatically by the
+      #   Rust compiler because the host OS is Windows.
+      - name: Build release binaries
         run: cargo build --manifest-path src/Cargo.toml --release --workspace
 
-      # Step 6: Collect binaries into a staging directory.
-      #   We create a folder named after the target platform and copy the three
-      #   application binaries into it. This makes packaging straightforward.
-      #   The `${{ matrix.binary_suffix }}` variable is `.exe` on Windows and
-      #   empty on Linux/macOS.
-      - name: Stage release binaries
-        run: |
-          # Create the staging directory. The folder name encodes the version
-          # tag and platform so the archive is self-identifying.
-          STAGING="kvm-over-ip-${{ github.ref_name }}-${{ matrix.target_name }}"
-          mkdir -p "$STAGING"
+      # Step 5: Install cargo-wix for building MSI packages.
+      #   cargo-wix is a cargo subcommand that wraps the WiX Toolset.
+      #   It reads [package.metadata.wix] from each crate's Cargo.toml.
+      #   WiX Toolset v3 is pre-installed on GitHub Windows runners.
+      - name: Install cargo-wix
+        run: cargo install cargo-wix --version "0.3" --locked
 
-          # Copy each application binary into the staging folder.
-          cp "src/target/release/kvm-master${{ matrix.binary_suffix }}"     "$STAGING/"
-          cp "src/target/release/kvm-client${{ matrix.binary_suffix }}"     "$STAGING/"
-          cp "src/target/release/kvm-web-bridge${{ matrix.binary_suffix }}" "$STAGING/"
-
-          # Copy project documentation so the archive is self-contained.
-          cp README.md "$STAGING/" 2>/dev/null || true
-
-          # Record the staging directory path for the next step.
-          echo "STAGING=$STAGING" >> "$GITHUB_ENV"
-
-      # Step 7: Create a compressed archive of the staging directory.
-      #   Windows → ZIP (the most familiar archive format for Windows users).
-      #   Linux/macOS → .tar.gz (standard Unix archive with gzip compression).
-      - name: Create archive (tar.gz – Linux/macOS)
-        if: matrix.archive_ext == 'tar.gz'
-        # $STAGING was written to $GITHUB_ENV by the "Stage release binaries"
-        # step and is available as a regular shell environment variable here.
-        run: |
-          tar -czf "${STAGING}.tar.gz" "${STAGING}"
-          echo "ARCHIVE=${STAGING}.tar.gz" >> "$GITHUB_ENV"
-
-      - name: Create archive (ZIP – Windows)
-        if: matrix.archive_ext == 'zip'
-        # PowerShell's Compress-Archive is available on Windows runners.
-        # We pass the staging directory name through a bash variable (STAGING)
-        # which was written to $GITHUB_ENV by the previous step. On Windows
-        # the bash shell reads $GITHUB_ENV just like on Linux/macOS, so
-        # $STAGING is available as a regular bash variable here.
+      # Step 6: Build the kvm-master MSI installer.
+      #   --package kvm-master       : Build only the kvm-master crate's WiX config.
+      #   --nocapture                : Print WiX compiler output to the workflow log.
+      #   --no-build                 : Skip recompiling; we already built in Step 4.
+      #
+      # NOTE: cargo-wix expects a wix\main.wxs file in the crate directory.
+      # It also expects the icon file at wix\kvm-master.ico.  If the icon does
+      # not exist, the build will fail.  A placeholder must be provided or the
+      # Icon element in main.wxs must be removed.
+      - name: Build kvm-master MSI
         shell: bash
         run: |
-          # $STAGING is the value written by the "Stage release binaries" step.
+          # Navigate into the src/ workspace where the crates live.
+          cd src
+
+          # cargo-wix reads the manifest from the specified package.
+          # --no-build avoids a second compilation pass (we compiled in Step 4).
+          cargo wix --package kvm-master --nocapture --no-build \
+            || { echo "cargo-wix for kvm-master failed"; exit 1; }
+
+      # Step 7: Build the kvm-client MSI installer.
+      - name: Build kvm-client MSI
+        shell: bash
+        run: |
+          cd src
+          cargo wix --package kvm-client --nocapture --no-build \
+            || { echo "cargo-wix for kvm-client failed"; exit 1; }
+
+      # Step 8: Stage binaries and MSI files into a single dist directory.
+      - name: Stage Windows release artefacts
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          STAGING="kvm-over-ip-${VERSION}-windows-x86_64"
+          mkdir -p "${STAGING}"
+
+          # Copy raw binaries into the staging directory.
+          cp src/target/release/kvm-master.exe     "${STAGING}/"
+          cp src/target/release/kvm-client.exe     "${STAGING}/"
+          cp src/target/release/kvm-web-bridge.exe "${STAGING}/"
+          cp README.md "${STAGING}/" 2>/dev/null || true
+
+          # Find and copy the generated MSI files.
+          # cargo-wix places MSIs in src/target/wix/*.msi
+          find src/target/wix -name "*.msi" 2>/dev/null | while read msi; do
+            cp "$msi" "${STAGING}/"
+          done
+
+          echo "STAGING=${STAGING}" >> "$GITHUB_ENV"
+
+      # Step 9: Create a ZIP archive of the staging directory.
+      - name: Create Windows archive (ZIP)
+        shell: bash
+        run: |
           ARCHIVE="${STAGING}.zip"
           powershell -Command "Compress-Archive -Path '${STAGING}' -DestinationPath '${ARCHIVE}'"
           echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
 
-      # Step 8: Upload the archive as a workflow artifact so the
-      # `create-github-release` job can download and attach it.
-      # Artifacts are stored by GitHub for the duration of the workflow run.
-      - name: Upload binary archive as workflow artifact
+      # Step 10: Upload the archive as a workflow artefact.
+      - name: Upload Windows artefacts
         uses: actions/upload-artifact@v4
         with:
-          # Unique artifact name per platform so they do not overwrite each other.
-          name: release-${{ matrix.target_name }}
+          name: release-windows-x86_64
           path: ${{ env.ARCHIVE }}
-          # If the upload fails (e.g., staging directory is empty) the job
-          # fails loudly rather than silently producing an empty release.
           if-no-files-found: error
+
+      # Step 11: Upload MSI files as separate named artefacts for easy download.
+      - name: Upload MSI installers as separate artefacts
+        shell: bash
+        run: |
+          # List the MSIs we produced for logging purposes.
+          find src/target/wix -name "*.msi" 2>/dev/null || echo "No MSI files found in src/target/wix"
+
+      - name: Upload kvm-master MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-kvm-master-windows
+          # cargo-wix names the MSI after the package with the version: kvm-master-<ver>-x86_64.msi
+          path: src/target/wix/*.msi
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  # JOB: build-linux
+  # ---------------------------------------------------------------------------
+  # Compiles Linux binaries and builds Debian .deb packages for kvm-client
+  # and kvm-web-bridge using cargo-deb.
+  # ---------------------------------------------------------------------------
+  build-linux:
+    name: Build Linux — binaries + .deb packages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      # Install X11/XTest development libraries required to compile kvm-client.
+      # These packages must be present for the linker to find libx11 and libxtst.
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libx11-dev \
+            libxtst-dev
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: linux-cargo-registry-${{ hashFiles('src/**/Cargo.lock', 'src/Cargo.toml') }}
+          restore-keys: |
+            linux-cargo-registry-
+
+      # Build all crates.  kvm-master is compiled here too (for correctness
+      # checking) even though it is Windows-only — Rust simply excludes the
+      # Win32 hook code on Linux.
+      - name: Build release binaries
+        run: cargo build --manifest-path src/Cargo.toml --release --workspace
+
+      # Install cargo-deb.
+      # cargo-deb reads [package.metadata.deb] from Cargo.toml and produces
+      # a proper .deb package including maintainer scripts and service files.
+      # Install cargo-deb without a version pin so the latest stable release is used.
+      # If you need a reproducible pin, replace with e.g. --version "2.1.0".
+      - name: Install cargo-deb
+        run: cargo install cargo-deb --locked
+
+      # Build the kvm-client .deb package.
+      # --no-build: skip recompilation (already built above).
+      # --manifest-path: path to the workspace Cargo.toml.
+      - name: Build kvm-client .deb package
+        run: |
+          cargo deb \
+            --manifest-path src/Cargo.toml \
+            --package kvm-client \
+            --no-build \
+            || { echo "cargo-deb for kvm-client failed"; exit 1; }
+
+      # Build the kvm-web-bridge .deb package.
+      - name: Build kvm-web-bridge .deb package
+        run: |
+          cargo deb \
+            --manifest-path src/Cargo.toml \
+            --package kvm-web-bridge \
+            --no-build \
+            || { echo "cargo-deb for kvm-web-bridge failed"; exit 1; }
+
+      # Stage all artefacts.
+      - name: Stage Linux release artefacts
+        run: |
+          VERSION="${{ github.ref_name }}"
+          STAGING="kvm-over-ip-${VERSION}-linux-x86_64"
+          mkdir -p "${STAGING}"
+
+          # Raw binaries.
+          cp src/target/release/kvm-master     "${STAGING}/" 2>/dev/null || true
+          cp src/target/release/kvm-client     "${STAGING}/"
+          cp src/target/release/kvm-web-bridge "${STAGING}/"
+          cp README.md "${STAGING}/" 2>/dev/null || true
+
+          # .deb packages: cargo-deb places them in src/target/debian/
+          find src/target/debian -name "*.deb" 2>/dev/null | while read deb; do
+            cp "$deb" "${STAGING}/"
+          done
+
+          echo "STAGING=${STAGING}" >> "$GITHUB_ENV"
+
+      - name: Create Linux archive (tar.gz)
+        run: |
+          tar -czf "${STAGING}.tar.gz" "${STAGING}"
+          echo "ARCHIVE=${STAGING}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Upload Linux artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-x86_64
+          path: ${{ env.ARCHIVE }}
+          if-no-files-found: error
+
+      # Upload .deb files as separate named artefacts.
+      - name: Upload .deb packages as separate artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-linux-deb
+          path: src/target/debian/*.deb
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  # JOB: build-macos
+  # ---------------------------------------------------------------------------
+  # Compiles macOS binaries and builds a .app bundle + .dmg disk image for
+  # kvm-client using cargo-bundle and the create-dmg.sh script.
+  # ---------------------------------------------------------------------------
+  build-macos:
+    name: Build macOS — binaries + .app/.dmg
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: macos-cargo-registry-${{ hashFiles('src/**/Cargo.lock', 'src/Cargo.toml') }}
+          restore-keys: |
+            macos-cargo-registry-
+
+      # Build release binaries.
+      - name: Build release binaries
+        run: cargo build --manifest-path src/Cargo.toml --release --workspace
+
+      # Install cargo-bundle for .app creation.
+      - name: Install cargo-bundle
+        run: cargo install cargo-bundle --locked
+
+      # Build the kvm-client .app bundle.
+      # cargo-bundle reads [package.metadata.bundle] from Cargo.toml.
+      - name: Build kvm-client .app bundle
+        run: |
+          cd src
+          cargo bundle --release --package kvm-client \
+            || { echo "cargo-bundle for kvm-client failed"; exit 1; }
+
+      # Inject the custom Info.plist into the bundle with version substitution.
+      - name: Inject Info.plist into .app bundle
+        run: |
+          VERSION="${{ github.ref_name }}"
+          # Remove the leading "v" from the tag name (e.g., v1.2.3 → 1.2.3).
+          APP_VERSION="${VERSION#v}"
+          SHORT_VERSION=$(echo "${APP_VERSION}" | cut -d. -f1-2)
+
+          BUNDLE_PATH="src/target/release/bundle/osx/KVM-Over-IP Client.app"
+
+          # Substitute template variables in our custom Info.plist.
+          sed \
+            -e "s/{{BUNDLE_VERSION}}/${APP_VERSION}/g" \
+            -e "s/{{SHORT_VERSION}}/${SHORT_VERSION}/g" \
+            build/macos/Info.plist \
+            > "${BUNDLE_PATH}/Contents/Info.plist"
+
+          echo "Info.plist injected successfully."
+
+      # Create the .dmg using hdiutil (create-dmg tool is not installed by default).
+      # We use hdiutil directly here for CI reliability.
+      - name: Create .dmg disk image
+        run: |
+          VERSION="${{ github.ref_name }}"
+          APP_VERSION="${VERSION#v}"
+          DMG_NAME="kvm-over-ip-${APP_VERSION}-macos"
+          BUNDLE_PATH="src/target/release/bundle/osx/KVM-Over-IP Client.app"
+
+          mkdir -p dist/macos
+
+          # Calculate bundle size with 20% headroom for the DMG.
+          SIZE_MB=$(du -sm "${BUNDLE_PATH}" | cut -f1)
+          SIZE_MB=$(( SIZE_MB * 6 / 5 + 20 ))
+
+          TMP_DMG="dist/macos/${DMG_NAME}-rw.dmg"
+          FINAL_DMG="dist/macos/${DMG_NAME}.dmg"
+
+          # Create a writable DMG.
+          hdiutil create \
+            -size "${SIZE_MB}m" \
+            -fs "HFS+" \
+            -volname "KVM-Over-IP ${APP_VERSION}" \
+            -format UDRW \
+            "${TMP_DMG}"
+
+          # Mount and populate it.
+          hdiutil attach "${TMP_DMG}" -mountpoint /Volumes/KVMOverIP_build
+
+          cp -R "${BUNDLE_PATH}" /Volumes/KVMOverIP_build/
+          ln -s /Applications /Volumes/KVMOverIP_build/Applications
+
+          hdiutil detach /Volumes/KVMOverIP_build
+
+          # Convert to compressed read-only DMG.
+          hdiutil convert "${TMP_DMG}" -format UDZO -o "${FINAL_DMG}"
+          rm -f "${TMP_DMG}"
+
+          echo "DMG created: ${FINAL_DMG}"
+          echo "DMG_PATH=${FINAL_DMG}" >> "$GITHUB_ENV"
+          echo "APP_VERSION=${APP_VERSION}" >> "$GITHUB_ENV"
+
+      # Stage all macOS artefacts into a single archive for the release job.
+      - name: Stage macOS release artefacts
+        run: |
+          VERSION="${{ github.ref_name }}"
+          STAGING="kvm-over-ip-${VERSION}-macos-aarch64"
+          mkdir -p "${STAGING}"
+
+          # Raw binaries.
+          cp src/target/release/kvm-client     "${STAGING}/"
+          cp src/target/release/kvm-web-bridge "${STAGING}/"
+          cp README.md "${STAGING}/" 2>/dev/null || true
+
+          # Copy the DMG into the staging directory.
+          cp "${DMG_PATH}" "${STAGING}/"
+
+          echo "STAGING=${STAGING}" >> "$GITHUB_ENV"
+
+      - name: Create macOS archive (tar.gz)
+        run: |
+          tar -czf "${STAGING}.tar.gz" "${STAGING}"
+          echo "ARCHIVE=${STAGING}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Upload macOS artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-aarch64
+          path: ${{ env.ARCHIVE }}
+          if-no-files-found: error
+
+      # Upload the .dmg as a separate named artefact for easy direct download.
+      - name: Upload .dmg as separate artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-macos-dmg
+          path: dist/macos/*.dmg
+          if-no-files-found: warn
 
   # ---------------------------------------------------------------------------
   # JOB: create-github-release
   # ---------------------------------------------------------------------------
-  # Downloads all three platform archives from the previous job and creates
-  # a GitHub Release, attaching the archives as release assets.
+  # Downloads all platform artefacts from the build jobs and creates a GitHub
+  # Release, attaching binary archives and installer packages as release assets.
   #
   # Why a separate job?
-  #   The three build jobs run in parallel. This final job uses `needs` to
+  #   The three build jobs run in parallel.  This final job uses `needs` to
   #   wait for all three to complete successfully before creating the release.
-  #   This prevents a partial release (e.g., only Windows binaries) from
-  #   appearing if one platform build fails.
+  #   This prevents a partial release from appearing if one platform fails.
   # ---------------------------------------------------------------------------
   create-github-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    # Only run after ALL three build jobs have completed successfully.
-    needs: build-release-binaries
+    needs: [build-windows, build-linux, build-macos]
 
     steps:
       - name: Check out repository (for changelog context)
         uses: actions/checkout@v4
         with:
-          # Fetch the full git history so that the changelog generator can
-          # compare commits between the new tag and the previous tag.
           fetch-depth: 0
 
-      # Download all three platform archives produced by the build jobs.
-      #   `pattern: release-*` matches all three artifact names:
-      #     release-linux-x86_64
-      #     release-windows-x86_64
-      #     release-macos-aarch64
-      #   `merge-multiple: true` places all files in a single `dist/` directory.
+      # Download all platform archives from the build jobs.
+      # The `pattern: release-*` matches all three archive artefacts.
+      # `merge-multiple: true` places all files in a single `dist/` directory.
       - name: Download all platform archives
         uses: actions/download-artifact@v4
         with:
@@ -253,52 +498,63 @@ jobs:
           path: dist/
           merge-multiple: true
 
-      # List the downloaded files for verification in the workflow log.
-      - name: List release assets
-        run: ls -lh dist/
+      # Download installer packages into a separate directory.
+      - name: Download installer packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: installer-*
+          path: installers/
+          merge-multiple: true
 
-      # Generate a changelog from git commits between this tag and the
-      # previous one. The `softprops/action-gh-release` action does this
-      # automatically when `generate_release_notes: true` is set.
+      # List all downloaded files for verification in the workflow log.
+      - name: List release artefacts
+        run: |
+          echo "=== Binary Archives ===" && ls -lh dist/ || true
+          echo "=== Installer Packages ===" && ls -lh installers/ || true
+
+      # Create the GitHub Release and attach all artefacts.
       #
-      # What `softprops/action-gh-release` does:
-      #   - Creates a GitHub Release for the tag that triggered this workflow.
-      #   - Sets the release title to the tag name (e.g., "v1.2.3").
-      #   - Generates release notes from commit messages since the last tag.
-      #   - Uploads every file matching `dist/*` as a release asset.
-      #   - Marks the release as a "pre-release" if the tag contains a
-      #     pre-release suffix (e.g., v1.0.0-beta.1).
+      # The release body is a hand-crafted table of downloads supplemented
+      # by auto-generated release notes from commit messages.
       - name: Create GitHub Release and upload assets
         uses: softprops/action-gh-release@v2
         with:
-          # Auto-generate release notes from commit messages.
           generate_release_notes: true
-          # A header prepended to the auto-generated notes.
           body: |
             ## KVM-Over-IP ${{ github.ref_name }}
 
-            ### Downloads
+            ### Downloads — Binary Archives (raw binaries + README)
 
-            | Platform      | Archive                                                    |
-            |---------------|------------------------------------------------------------|
-            | Windows x64   | `kvm-over-ip-${{ github.ref_name }}-windows-x86_64.zip`   |
-            | Linux x64     | `kvm-over-ip-${{ github.ref_name }}-linux-x86_64.tar.gz`  |
-            | macOS arm64   | `kvm-over-ip-${{ github.ref_name }}-macos-aarch64.tar.gz` |
+            | Platform      | Archive                                                       |
+            |---------------|---------------------------------------------------------------|
+            | Windows x64   | `kvm-over-ip-${{ github.ref_name }}-windows-x86_64.zip`      |
+            | Linux x64     | `kvm-over-ip-${{ github.ref_name }}-linux-x86_64.tar.gz`     |
+            | macOS arm64   | `kvm-over-ip-${{ github.ref_name }}-macos-aarch64.tar.gz`    |
 
-            ### Installation
+            ### Downloads — Installers (recommended)
 
-            1. Download the archive for your operating system.
-            2. Extract the contents.
-            3. Run `kvm-master` on the machine that has the keyboard/mouse.
-            4. Run `kvm-client` on each remote machine.
-            5. Optionally run `kvm-web-bridge` to enable browser-based access.
+            | Platform      | Installer                                      | Tool       |
+            |---------------|------------------------------------------------|------------|
+            | Windows x64   | `kvm-master-*.msi` / `kvm-client-*.msi`        | cargo-wix  |
+            | Linux x64     | `kvm-client_*.deb` / `kvm-web-bridge_*.deb`    | cargo-deb  |
+            | macOS arm64   | `kvm-over-ip-*-macos.dmg`                      | hdiutil    |
 
-            See `README.md` inside the archive for full setup instructions.
+            ### Quick Start
+
+            1. **Master machine** (the machine with the physical keyboard/mouse):
+               - Windows: install `kvm-master-*.msi` and run KVM-Over-IP Master
+            2. **Client machine** (the machine that will receive forwarded input):
+               - Windows: install `kvm-client-*.msi`
+               - Linux: `sudo apt install ./kvm-client_*.deb`
+               - macOS: open the `.dmg` and drag `KVM-Over-IP Client.app` to `/Applications`
+            3. **Optional** — run `kvm-web-bridge` on the master machine to enable browser-based access.
+
+            See `README.md` inside each archive for full setup instructions.
 
             ---
-            *Auto-generated release notes from commits:*
-          # Upload all archives from the dist/ directory.
-          files: dist/*
-          # Fail loudly if the tag ref is not a proper version tag, rather
-          # than silently creating a malformed release.
-          fail_on_unmatched_files: true
+            *Auto-generated release notes from commits since previous tag:*
+          # Upload everything from both the archives directory and the installers directory.
+          files: |
+            dist/*
+            installers/*
+          fail_on_unmatched_files: false

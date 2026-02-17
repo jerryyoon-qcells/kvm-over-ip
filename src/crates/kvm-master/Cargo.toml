@@ -6,6 +6,17 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
+# homepage and repository are displayed in Add/Remove Programs via cargo-wix
+homepage = "https://github.com/your-org/kvm-over-ip"
+repository = "https://github.com/your-org/kvm-over-ip"
+
+# cargo-wix reads this section to find the WiX source file.
+# Run `cargo wix --package kvm-master` to build the MSI.
+# See: https://github.com/volks73/cargo-wix
+[package.metadata.wix]
+# Path to the WiX source file, relative to this Cargo.toml.
+# cargo-wix will compile main.wxs into an MSI installer.
+wxs = "wix/main.wxs"
 
 [lib]
 name = "kvm_master"

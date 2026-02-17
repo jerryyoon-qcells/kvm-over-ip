@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+
+<!--
+  ============================================================================
+  Info.plist — macOS Application Bundle Metadata for KVM-Over-IP Client
+  ============================================================================
+
+  PURPOSE:
+    Every macOS .app bundle contains an Info.plist file that tells macOS
+    and the Finder important information about the application:
+      - What the app is called
+      - Which executable file to run
+      - What icon to use
+      - What OS version is required
+      - What permissions the app needs
+      - Whether the app can be launched from the menu bar or dock
+
+  WHAT IS A .APP BUNDLE? (for beginners)
+    On macOS, an ".app" is actually a directory (folder) that appears as a
+    single file in the Finder.  The directory structure is:
+      KVM-Over-IP Client.app/
+        Contents/
+          Info.plist        ← this file
+          MacOS/
+            kvm-client      ← the compiled Rust binary
+          Resources/
+            AppIcon.icns    ← the application icon
+          entitlements.plist← permission declarations
+
+  HOW TO BUILD THE APP BUNDLE:
+    Using cargo-bundle (see build/package-macos.sh):
+      cargo bundle --release --package kvm-client
+
+    cargo-bundle reads [package.metadata.bundle] from Cargo.toml and
+    generates the .app bundle automatically.  This Info.plist is used as
+    a template; cargo-bundle substitutes version numbers and bundle IDs.
+
+  TEMPLATE VARIABLES:
+    The strings in CAPS_WITH_BRACKETS below are placeholders that the
+    build script (package-macos.sh) replaces using sed before bundling:
+      {{BUNDLE_VERSION}}   → e.g., 0.1.0
+      {{SHORT_VERSION}}    → e.g., 0.1 (major.minor only)
+  ============================================================================
+-->
+
+<plist version="1.0">
+<dict>
+
+  <!-- ========================================================================
+       BASIC APPLICATION IDENTITY
+       ======================================================================== -->
+
+  <!--
+    CFBundleName: The short name of the application.
+    Shown in the menu bar when the app is active.
+  -->
+  <key>CFBundleName</key>
+  <string>KVM-Over-IP Client</string>
+
+  <!--
+    CFBundleDisplayName: The full name shown under the icon in Finder.
+    Can be longer than CFBundleName.
+  -->
+  <key>CFBundleDisplayName</key>
+  <string>KVM-Over-IP Client</string>
+
+  <!--
+    CFBundleIdentifier: A globally unique reverse-DNS identifier.
+    macOS uses this to identify the app for permissions, preferences, etc.
+    Replace "your-org" with your actual organization or GitHub username.
+  -->
+  <key>CFBundleIdentifier</key>
+  <string>com.your-org.kvm-over-ip.client</string>
+
+  <!--
+    CFBundleVersion: Build version (integer or dot-separated integers).
+    This is the internal version used by the OS for comparisons.
+    Typically the full semantic version: major.minor.patch.
+  -->
+  <key>CFBundleVersion</key>
+  <string>{{BUNDLE_VERSION}}</string>
+
+  <!--
+    CFBundleShortVersionString: Marketing version shown to users.
+    Displayed in "About This App" and in the App Store.
+  -->
+  <key>CFBundleShortVersionString</key>
+  <string>{{SHORT_VERSION}}</string>
+
+  <!--
+    CFBundlePackageType: APPL = application (as opposed to FMWK for
+    frameworks or BNDL for generic bundles).
+  -->
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+
+  <!--
+    CFBundleSignature: Four-character creator code.  Historically used by
+    the Classic Mac OS; still present by convention.  '????' is the default
+    for apps without a registered code.
+  -->
+  <key>CFBundleSignature</key>
+  <string>????</string>
+
+  <!-- ========================================================================
+       EXECUTABLE
+       ======================================================================== -->
+
+  <!--
+    CFBundleExecutable: The name of the binary file inside Contents/MacOS/.
+    macOS launches this file when the user opens the app.
+  -->
+  <key>CFBundleExecutable</key>
+  <string>kvm-client</string>
+
+  <!-- ========================================================================
+       ICON
+       ======================================================================== -->
+
+  <!--
+    CFBundleIconFile: The name of the .icns file inside Contents/Resources/
+    (without the .icns extension).
+  -->
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
+
+  <!-- ========================================================================
+       OPERATING SYSTEM REQUIREMENTS
+       ======================================================================== -->
+
+  <!--
+    LSMinimumSystemVersion: The minimum macOS version required to run this app.
+    12.0 = macOS Monterey.  The kvm-client uses CoreGraphics which is available
+    on all macOS versions we target, but 12.0 is chosen as a reasonable minimum
+    for modern Metal/CGEvent APIs.
+  -->
+  <key>LSMinimumSystemVersion</key>
+  <string>12.0</string>
+
+  <!--
+    NSHighResolutionCapable: Set to true to enable HiDPI / Retina display
+    support.  Without this, the app is rendered at 1x and blurry on Retina Macs.
+  -->
+  <key>NSHighResolutionCapable</key>
+  <true/>
+
+  <!-- ========================================================================
+       APPLICATION PRESENTATION
+       ======================================================================== -->
+
+  <!--
+    LSUIElement: When true, the app does NOT appear in the Dock or App Switcher.
+    This is appropriate for background daemons and menu bar utilities.
+    Set to false if you want the app to appear in the Dock.
+
+    For kvm-client, the value depends on whether it has a GUI:
+      - Headless/CLI mode → true (no Dock icon)
+      - GUI mode          → false or remove this key
+  -->
+  <key>LSUIElement</key>
+  <true/>
+
+  <!--
+    NSPrincipalClass: The Objective-C class used to create the application
+    object.  For pure Swift/Rust apps without AppKit, this can be omitted,
+    but many macOS tools expect it to be present.
+  -->
+  <key>NSPrincipalClass</key>
+  <string>NSApplication</string>
+
+  <!--
+    NSHumanReadableCopyright: Copyright string displayed in the About panel.
+  -->
+  <key>NSHumanReadableCopyright</key>
+  <string>Copyright © 2024 KVM-Over-IP Contributors. MIT License.</string>
+
+  <!-- ========================================================================
+       PERMISSIONS AND ENTITLEMENTS
+       ======================================================================== -->
+
+  <!--
+    NSAppleEventsUsageDescription: Required if the app sends Apple Events to
+    other apps.  Not needed for kvm-client unless it controls other apps.
+  -->
+
+  <!--
+    com.apple.security.automation.apple-events: Declared in entitlements.plist,
+    not here.  See build/macos/entitlements.plist for all declared entitlements.
+  -->
+
+</dict>
+</plist>

@@ -1,0 +1,66 @@
+# =============================================================================
+# kvm-client.desktop — Desktop Entry File for KVM-Over-IP Client
+# =============================================================================
+#
+# PURPOSE:
+#   This file tells Linux desktop environments (GNOME, KDE, XFCE, etc.) how
+#   to display and launch the KVM-Over-IP Client application.
+#
+# WHAT IS A .DESKTOP FILE? (for beginners)
+#   A .desktop file is the Linux equivalent of a Windows shortcut (.lnk file).
+#   When placed in /usr/share/applications/, the desktop environment reads it
+#   and shows the application in the application menu / launcher.
+#
+# SPECIFICATION:
+#   This file follows the XDG Desktop Entry Specification:
+#   https://specifications.freedesktop.org/desktop-entry-spec/latest/
+#
+# INSTALLATION:
+#   The .deb package installs this file to:
+#     /usr/share/applications/kvm-client.desktop
+#   The desktop environment automatically picks it up — no restart needed.
+#
+# ICON:
+#   The Icon= line references "kvm-client" without a path or extension.
+#   The desktop environment searches standard icon theme paths for the icon.
+#   Place icon files in /usr/share/icons/hicolor/<size>/apps/kvm-client.png
+#   (or .svg for scalable icons).
+# =============================================================================
+
+[Desktop Entry]
+
+# Version of the Desktop Entry Specification this file conforms to.
+Version=1.0
+
+# Type must be "Application" for executable programs.
+Type=Application
+
+# The application name shown in the menu.
+Name=KVM-Over-IP Client
+
+# A longer description shown as a tooltip in some desktop environments.
+Comment=Receive forwarded keyboard and mouse input from a KVM-Over-IP Master
+
+# Name of the icon to use (without path or extension).
+# The desktop environment resolves this using the icon theme search path.
+Icon=kvm-client
+
+# Full command to execute when the user launches the application.
+# %u is replaced with the URL if launched from a URI (not used here).
+Exec=/usr/bin/kvm-client
+
+# The application runs in a terminal window.
+# Set to true if kvm-client is a CLI program with no GUI.
+# Set to false if it has its own graphical window.
+Terminal=true
+
+# Application categories that determine which menu section it appears in.
+# "Network" places it in the network/internet section.
+Categories=Network;Utility;
+
+# Keywords for search — users can type these in the app launcher to find it.
+Keywords=KVM;remote;input;keyboard;mouse;network;
+
+# Mark as suitable for all users (not just admins).
+# The application may still require network permissions at runtime.
+StartupNotify=false
