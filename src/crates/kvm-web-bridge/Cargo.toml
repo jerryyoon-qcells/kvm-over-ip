@@ -12,13 +12,31 @@ name = "kvm-web-bridge"
 path = "src/main.rs"
 
 [dependencies]
+# Shared KVM protocol types and codec (binary message encoding/decoding)
 kvm-core = { path = "../kvm-core" }
+# Async runtime — used for all network I/O, spawning tasks, and timers
 tokio = { workspace = true }
+# WebSocket library built on top of tokio (handles RFC 6455 handshake + framing)
+tokio-tungstenite = { workspace = true }
+# Stream/sink combinator utilities required by tokio-tungstenite (SinkExt, StreamExt)
+futures-util = "0.3"
+# JSON serialization/deserialization for the browser-facing WebSocket protocol
 serde = { workspace = true }
+serde_json = { workspace = true }
+# Typed, composable error types (for BridgeError)
 thiserror = { workspace = true }
+# Flexible error handling with context chaining (for top-level Result returns)
 anyhow = { workspace = true }
+# Structured, async-aware logging
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+# Unique session identifiers
+uuid = { workspace = true }
+# Command-line argument parsing (--ws-port, --master-host, --master-port)
+# The "env" feature enables reading defaults from environment variables in #[arg(env = "...")].
+clap = { version = "4", features = ["derive", "env"] }
 
 [dev-dependencies]
+# Tokio test utilities (for #[tokio::test] async test functions)
 tokio = { workspace = true }
+serde_json = { workspace = true }
