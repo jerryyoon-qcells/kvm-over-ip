@@ -213,6 +213,7 @@ fn current_timestamp_us() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
 
     #[test]
     fn test_is_timeout_error_recognises_timed_out() {

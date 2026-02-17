@@ -89,6 +89,7 @@ pub fn screen_info_changed(old: &ScreenInfoMessage, new: &ScreenInfoMessage) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kvm_core::protocol::messages::MonitorInfo;
 
     /// Helper: builds a single-monitor ScreenInfoMessage with the given dimensions.
     fn make_screen_info(w: u32, h: u32) -> ScreenInfoMessage {

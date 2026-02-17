@@ -367,7 +367,7 @@ pub fn base64_encode(data: &[u8]) -> String {
 
     // Pre-allocate the output: every 3 input bytes map to 4 output chars,
     // rounded up.  This avoids reallocations in the loop.
-    let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
+    let mut result = String::with_capacity(data.len().div_ceil(3) * 4);
 
     // Process the input in 3-byte chunks.
     for chunk in data.chunks(3) {

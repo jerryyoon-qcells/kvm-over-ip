@@ -322,6 +322,7 @@ pub async fn get_sharing_enabled(_state: Arc<AppState>) -> CommandResult<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::infrastructure::storage::config::config_file_path;
 
     /// Creates a test-isolated AppState using AppConfig::default() so that tests
     /// never read from or write to the real platform config file on disk.

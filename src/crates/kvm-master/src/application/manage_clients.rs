@@ -116,6 +116,7 @@ impl ClientRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
 
     fn make_client(name: &str) -> ClientRuntimeState {
         ClientRuntimeState {
