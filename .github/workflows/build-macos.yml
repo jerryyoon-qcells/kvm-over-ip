@@ -1,0 +1,203 @@
+# =============================================================================
+# Build macOS Package — manual workflow for building the macOS .dmg installer
+# =============================================================================
+#
+# PURPOSE:
+#   Build the macOS .app bundle and .dmg disk image on a GitHub-hosted macOS
+#   runner.  This is useful for testing macOS packaging without creating a
+#   full release tag.
+#
+# HOW TO TRIGGER:
+#   Go to Actions → "Build macOS Package" → "Run workflow" in the GitHub UI,
+#   or use the CLI:
+#     gh workflow run build-macos.yml
+#
+# OUTPUT:
+#   A downloadable artefact named "macos-package" containing the .dmg file
+#   and raw binaries.
+
+name: Build macOS Package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build-macos:
+    name: Build macOS — binaries + .app/.dmg
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: macos-cargo-registry-${{ hashFiles('src/**/Cargo.lock', 'src/Cargo.toml') }}
+          restore-keys: |
+            macos-cargo-registry-
+
+      - name: Cache Cargo build target directory
+        uses: actions/cache@v4
+        with:
+          path: src/target
+          key: macos-cargo-target-${{ hashFiles('src/**/Cargo.lock', 'src/Cargo.toml') }}
+          restore-keys: |
+            macos-cargo-target-
+
+      - name: Build release binaries
+        run: cargo build --manifest-path src/Cargo.toml --release --workspace
+
+      - name: Install cargo-bundle
+        run: cargo install cargo-bundle --locked
+
+      # Generate AppIcon.icns from SVG if it doesn't already exist.
+      # Uses sips (built into macOS) to convert PNG sizes, then iconutil
+      # to produce the .icns file.  No third-party tools needed.
+      - name: Generate AppIcon.icns from SVG
+        run: |
+          ICNS_FILE="build/macos/AppIcon.icns"
+          SVG_FILE="build/macos/AppIcon.svg"
+
+          if [ -f "${ICNS_FILE}" ]; then
+            echo "AppIcon.icns already exists — skipping generation."
+            exit 0
+          fi
+
+          # If no SVG either, create a placeholder .icns so cargo-bundle
+          # doesn't fail.  We use sips to create a simple 1024x1024 PNG.
+          ICONSET_DIR="build/macos/AppIcon.iconset"
+          mkdir -p "${ICONSET_DIR}"
+
+          # Try rsvg-convert first (if available), then fall back to sips
+          if command -v rsvg-convert &>/dev/null && [ -f "${SVG_FILE}" ]; then
+            for size in 16 32 64 128 256 512 1024; do
+              rsvg-convert -w "${size}" -h "${size}" "${SVG_FILE}" \
+                -o "${ICONSET_DIR}/icon_${size}.png"
+            done
+          else
+            echo "rsvg-convert not available; creating placeholder icon."
+            # Create a simple 1024x1024 blue square as placeholder
+            python3 -c "
+          import struct, zlib
+          def create_png(w, h, r, g, b):
+              def chunk(ctype, data):
+                  c = ctype + data
+                  return struct.pack('>I', len(data)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
+              raw = b''
+              for _ in range(h):
+                  raw += b'\x00' + bytes([r, g, b]) * w
+              return (b'\x89PNG\r\n\x1a\n' +
+                      chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0)) +
+                      chunk(b'IDAT', zlib.compress(raw)) +
+                      chunk(b'IEND', b''))
+          for size in [16, 32, 64, 128, 256, 512, 1024]:
+              with open(f'build/macos/AppIcon.iconset/icon_{size}.png', 'wb') as f:
+                  f.write(create_png(size, size, 41, 98, 255))
+          "
+          fi
+
+          # Arrange into iconset with macOS naming conventions
+          cd "${ICONSET_DIR}"
+          cp icon_16.png   icon_16x16.png
+          cp icon_32.png   icon_16x16@2x.png
+          cp icon_32.png   icon_32x32.png
+          cp icon_64.png   icon_32x32@2x.png
+          cp icon_128.png  icon_128x128.png
+          cp icon_256.png  icon_128x128@2x.png
+          cp icon_256.png  icon_256x256.png
+          cp icon_512.png  icon_256x256@2x.png
+          cp icon_512.png  icon_512x512.png
+          cp icon_1024.png icon_512x512@2x.png
+          cd -
+
+          # Convert to .icns using Apple's iconutil
+          iconutil -c icns "${ICONSET_DIR}" -o "${ICNS_FILE}"
+          rm -rf "${ICONSET_DIR}"
+
+          echo "AppIcon.icns generated successfully."
+
+      - name: Build kvm-client .app bundle
+        run: |
+          cd src
+          cargo bundle --release --package kvm-client
+
+      - name: Inject Info.plist into .app bundle
+        run: |
+          # Read version from Cargo.toml
+          APP_VERSION=$(grep -m1 '^version' src/Cargo.toml \
+            | sed 's/version *= *"\(.*\)"/\1/')
+          SHORT_VERSION=$(echo "${APP_VERSION}" | cut -d. -f1-2)
+
+          BUNDLE_PATH="src/target/release/bundle/osx/KVM-Over-IP Client.app"
+
+          sed \
+            -e "s/{{BUNDLE_VERSION}}/${APP_VERSION}/g" \
+            -e "s/{{SHORT_VERSION}}/${SHORT_VERSION}/g" \
+            build/macos/Info.plist \
+            > "${BUNDLE_PATH}/Contents/Info.plist"
+
+          echo "Info.plist injected (version ${APP_VERSION})."
+
+      - name: Create .dmg disk image
+        run: |
+          APP_VERSION=$(grep -m1 '^version' src/Cargo.toml \
+            | sed 's/version *= *"\(.*\)"/\1/')
+          DMG_NAME="kvm-over-ip-${APP_VERSION}-macos"
+          BUNDLE_PATH="src/target/release/bundle/osx/KVM-Over-IP Client.app"
+
+          mkdir -p dist/macos
+
+          # Calculate bundle size with headroom
+          SIZE_MB=$(du -sm "${BUNDLE_PATH}" | cut -f1)
+          SIZE_MB=$(( SIZE_MB * 6 / 5 + 20 ))
+
+          TMP_DMG="dist/macos/${DMG_NAME}-rw.dmg"
+          FINAL_DMG="dist/macos/${DMG_NAME}.dmg"
+
+          hdiutil create \
+            -size "${SIZE_MB}m" \
+            -fs "HFS+" \
+            -volname "KVM-Over-IP ${APP_VERSION}" \
+            -format UDRW \
+            "${TMP_DMG}"
+
+          hdiutil attach "${TMP_DMG}" -mountpoint /Volumes/KVMOverIP_build
+          cp -R "${BUNDLE_PATH}" /Volumes/KVMOverIP_build/
+          ln -s /Applications /Volumes/KVMOverIP_build/Applications
+          hdiutil detach /Volumes/KVMOverIP_build
+
+          hdiutil convert "${TMP_DMG}" -format UDZO -o "${FINAL_DMG}"
+          rm -f "${TMP_DMG}"
+
+          echo "DMG created: ${FINAL_DMG}"
+
+      - name: Stage artefacts
+        run: |
+          mkdir -p staging
+          cp src/target/release/kvm-client     staging/
+          cp src/target/release/kvm-web-bridge staging/
+          cp dist/macos/*.dmg                  staging/
+          echo "=== Staged artefacts ==="
+          ls -lh staging/
+
+      - name: Upload macOS package
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-package
+          path: staging/*
+          if-no-files-found: error
