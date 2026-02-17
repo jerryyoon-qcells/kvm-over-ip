@@ -35,7 +35,7 @@ tokio-tungstenite = { version = "0.24", features = ["connect"] }
 # JSON serialization (used by kvm-web-bridge for the browser-facing protocol)
 serde_json = "1"
 # Testing
-mockall = "0.13"
+mockall = "0.14"
 tokio-test = "0.4"
 # Benchmarking
 criterion = { version = "0.5", features = ["html_reports"] }
