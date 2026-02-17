@@ -85,11 +85,7 @@ impl PlatformInputEmulator for MockInputEmulator {
     }
 
     /// Records the key-up event, or returns an error if `should_fail` is set.
-    fn emit_key_up(
-        &self,
-        key: HidKeyCode,
-        modifiers: ModifierFlags,
-    ) -> Result<(), EmulationError> {
+    fn emit_key_up(&self, key: HidKeyCode, modifiers: ModifierFlags) -> Result<(), EmulationError> {
         if self.should_fail {
             return Err(EmulationError::Platform("mock failure".into()));
         }
@@ -117,7 +113,10 @@ impl PlatformInputEmulator for MockInputEmulator {
         if self.should_fail {
             return Err(EmulationError::Platform("mock failure".into()));
         }
-        self.mouse_buttons.lock().unwrap().push((button, pressed, x, y));
+        self.mouse_buttons
+            .lock()
+            .unwrap()
+            .push((button, pressed, x, y));
         Ok(())
     }
 

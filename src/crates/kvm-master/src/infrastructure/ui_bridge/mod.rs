@@ -51,7 +51,7 @@ use crate::application::{
 };
 use crate::infrastructure::{
     network::connection_manager::{ConnectionManager, NetworkConfig},
-    storage::config::{config_file_path, load_config, save_config, AppConfig, ClientLayoutEntry},
+    storage::config::{load_config, save_config, AppConfig, ClientLayoutEntry},
 };
 use kvm_core::ClientId;
 
@@ -162,10 +162,18 @@ pub struct CommandResult<T: Serialize> {
 
 impl<T: Serialize> CommandResult<T> {
     pub fn ok(data: T) -> Self {
-        Self { success: true, data: Some(data), error: None }
+        Self {
+            success: true,
+            data: Some(data),
+            error: None,
+        }
     }
     pub fn err(msg: impl Into<String>) -> Self {
-        Self { success: false, data: None, error: Some(msg.into()) }
+        Self {
+            success: false,
+            data: None,
+            error: Some(msg.into()),
+        }
     }
 }
 
@@ -233,7 +241,10 @@ pub async fn update_layout(
     // Lock config to get master dimensions
     let (master_w, master_h) = {
         let cfg = state.config.lock().await;
-        (cfg.layout.master_screen_width, cfg.layout.master_screen_height)
+        (
+            cfg.layout.master_screen_width,
+            cfg.layout.master_screen_height,
+        )
     };
 
     // Validate layout geometry
@@ -246,14 +257,17 @@ pub async fn update_layout(
     cfg.layout.clients = clients
         .iter()
         .filter_map(|dto| {
-            dto.client_id.parse::<ClientId>().ok().map(|id| ClientLayoutEntry {
-                client_id: id,
-                name: dto.name.clone(),
-                x_offset: dto.x_offset,
-                y_offset: dto.y_offset,
-                width: dto.width,
-                height: dto.height,
-            })
+            dto.client_id
+                .parse::<ClientId>()
+                .ok()
+                .map(|id| ClientLayoutEntry {
+                    client_id: id,
+                    name: dto.name.clone(),
+                    x_offset: dto.x_offset,
+                    y_offset: dto.y_offset,
+                    width: dto.width,
+                    height: dto.height,
+                })
         })
         .collect();
 
@@ -396,7 +410,11 @@ mod tests {
         let result = update_layout(state, clients).await;
 
         // Assert
-        assert!(result.success, "expected success, got error: {:?}", result.error);
+        assert!(
+            result.success,
+            "expected success, got error: {:?}",
+            result.error
+        );
 
         // Cleanup: remove the config file written to the real platform config dir
         // to avoid contaminating subsequent test runs.

@@ -267,9 +267,7 @@ async fn run_session(
                         }
                     }
                     Err(e) => {
-                        error!(
-                            "session {session_id_m2b}: JSON serialization error: {e}"
-                        );
+                        error!("session {session_id_m2b}: JSON serialization error: {e}");
                     }
                 }
             }
@@ -314,18 +312,16 @@ async fn run_session(
                 match ws_msg {
                     WsMessage::Text(json_str) => {
                         // Parse the JSON message from the browser.
-                        let browser_msg: BrowserToMasterMsg =
-                            match serde_json::from_str(&json_str) {
-                                Ok(m) => m,
-                                Err(e) => {
-                                    warn!(
-                                        "session {session_id_b2m}: invalid JSON from browser: {e}"
-                                    );
-                                    // Don't close the session for one bad message; the
-                                    // browser might retry on the next interaction.
-                                    continue;
-                                }
-                            };
+                        let browser_msg: BrowserToMasterMsg = match serde_json::from_str(&json_str)
+                        {
+                            Ok(m) => m,
+                            Err(e) => {
+                                warn!("session {session_id_b2m}: invalid JSON from browser: {e}");
+                                // Don't close the session for one bad message; the
+                                // browser might retry on the next interaction.
+                                continue;
+                            }
+                        };
 
                         debug!(
                             "session {session_id_b2m}: browser → master: {}",
@@ -336,9 +332,7 @@ async fn run_session(
                         let kvm_msg = match translate_browser_to_kvm(&browser_msg) {
                             Ok(m) => m,
                             Err(e) => {
-                                warn!(
-                                    "session {session_id_b2m}: translation error: {e}"
-                                );
+                                warn!("session {session_id_b2m}: translation error: {e}");
                                 continue;
                             }
                         };
@@ -543,7 +537,10 @@ mod tests {
         // Must not include the secret pin_hash in the output string
         let name = browser_msg_type_name(&msg);
         assert_eq!(name, "PairingResponse");
-        assert!(!name.contains("secret"), "type name must not expose field values");
+        assert!(
+            !name.contains("secret"),
+            "type name must not expose field values"
+        );
     }
 
     #[test]

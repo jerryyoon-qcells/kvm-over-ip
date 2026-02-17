@@ -188,11 +188,17 @@ async fn main() -> anyhow::Result<()> {
                         let mut status = app_state.connection_status.lock().await;
                         *status = ClientConnectionStatus::Active;
                     } else {
-                        warn!("master rejected connection (reason code {})", ack.reject_reason);
+                        warn!(
+                            "master rejected connection (reason code {})",
+                            ack.reject_reason
+                        );
                     }
                 }
                 KvmMessage::PairingRequest(req) => {
-                    info!("pairing requested (session {}); PIN display not yet implemented", req.pairing_session_id);
+                    info!(
+                        "pairing requested (session {}); PIN display not yet implemented",
+                        req.pairing_session_id
+                    );
                     let mut status = app_state.connection_status.lock().await;
                     *status = ClientConnectionStatus::Pairing;
                 }

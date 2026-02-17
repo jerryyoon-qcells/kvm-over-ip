@@ -81,20 +81,20 @@ pub fn hid_to_keysym(hid: HidKeyCode) -> Option<u32> {
         HidKeyCode::Digit9 => Some(0x0039), // XK_9
 
         // Control keys
-        HidKeyCode::Enter => Some(0xFF0D),     // XK_Return
-        HidKeyCode::Escape => Some(0xFF1B),    // XK_Escape
-        HidKeyCode::Backspace => Some(0xFF08), // XK_BackSpace
-        HidKeyCode::Tab => Some(0xFF09),       // XK_Tab
-        HidKeyCode::Space => Some(0x0020),     // XK_space
-        HidKeyCode::CapsLock => Some(0xFFE5),  // XK_Caps_Lock
-        HidKeyCode::ScrollLock => Some(0xFF14),// XK_Scroll_Lock
-        HidKeyCode::Pause => Some(0xFF13),     // XK_Pause
-        HidKeyCode::Insert => Some(0xFF63),    // XK_Insert
-        HidKeyCode::Home => Some(0xFF50),      // XK_Home
-        HidKeyCode::PageUp => Some(0xFF55),    // XK_Page_Up
-        HidKeyCode::Delete => Some(0xFFFF),    // XK_Delete
-        HidKeyCode::End => Some(0xFF57),       // XK_End
-        HidKeyCode::PageDown => Some(0xFF56),  // XK_Page_Down
+        HidKeyCode::Enter => Some(0xFF0D),       // XK_Return
+        HidKeyCode::Escape => Some(0xFF1B),      // XK_Escape
+        HidKeyCode::Backspace => Some(0xFF08),   // XK_BackSpace
+        HidKeyCode::Tab => Some(0xFF09),         // XK_Tab
+        HidKeyCode::Space => Some(0x0020),       // XK_space
+        HidKeyCode::CapsLock => Some(0xFFE5),    // XK_Caps_Lock
+        HidKeyCode::ScrollLock => Some(0xFF14),  // XK_Scroll_Lock
+        HidKeyCode::Pause => Some(0xFF13),       // XK_Pause
+        HidKeyCode::Insert => Some(0xFF63),      // XK_Insert
+        HidKeyCode::Home => Some(0xFF50),        // XK_Home
+        HidKeyCode::PageUp => Some(0xFF55),      // XK_Page_Up
+        HidKeyCode::Delete => Some(0xFFFF),      // XK_Delete
+        HidKeyCode::End => Some(0xFF57),         // XK_End
+        HidKeyCode::PageDown => Some(0xFF56),    // XK_Page_Down
         HidKeyCode::PrintScreen => Some(0xFF61), // XK_Print
         HidKeyCode::ContextMenu => Some(0xFF67), // XK_Menu
 
@@ -119,23 +119,23 @@ pub fn hid_to_keysym(hid: HidKeyCode) -> Option<u32> {
         HidKeyCode::F12 => Some(0xFFC9), // XK_F12
 
         // Numpad
-        HidKeyCode::NumLock => Some(0xFF7F),         // XK_Num_Lock
-        HidKeyCode::NumpadDivide => Some(0xFFAF),    // XK_KP_Divide
-        HidKeyCode::NumpadMultiply => Some(0xFFAA),  // XK_KP_Multiply
-        HidKeyCode::NumpadSubtract => Some(0xFFAD),  // XK_KP_Subtract
-        HidKeyCode::NumpadAdd => Some(0xFFAB),       // XK_KP_Add
-        HidKeyCode::NumpadEnter => Some(0xFF8D),     // XK_KP_Enter
-        HidKeyCode::Numpad0 => Some(0xFFB0),         // XK_KP_0
-        HidKeyCode::Numpad1 => Some(0xFFB1),         // XK_KP_1
-        HidKeyCode::Numpad2 => Some(0xFFB2),         // XK_KP_2
-        HidKeyCode::Numpad3 => Some(0xFFB3),         // XK_KP_3
-        HidKeyCode::Numpad4 => Some(0xFFB4),         // XK_KP_4
-        HidKeyCode::Numpad5 => Some(0xFFB5),         // XK_KP_5
-        HidKeyCode::Numpad6 => Some(0xFFB6),         // XK_KP_6
-        HidKeyCode::Numpad7 => Some(0xFFB7),         // XK_KP_7
-        HidKeyCode::Numpad8 => Some(0xFFB8),         // XK_KP_8
-        HidKeyCode::Numpad9 => Some(0xFFB9),         // XK_KP_9
-        HidKeyCode::NumpadDecimal => Some(0xFFAE),   // XK_KP_Decimal
+        HidKeyCode::NumLock => Some(0xFF7F),      // XK_Num_Lock
+        HidKeyCode::NumpadDivide => Some(0xFFAF), // XK_KP_Divide
+        HidKeyCode::NumpadMultiply => Some(0xFFAA), // XK_KP_Multiply
+        HidKeyCode::NumpadSubtract => Some(0xFFAD), // XK_KP_Subtract
+        HidKeyCode::NumpadAdd => Some(0xFFAB),    // XK_KP_Add
+        HidKeyCode::NumpadEnter => Some(0xFF8D),  // XK_KP_Enter
+        HidKeyCode::Numpad0 => Some(0xFFB0),      // XK_KP_0
+        HidKeyCode::Numpad1 => Some(0xFFB1),      // XK_KP_1
+        HidKeyCode::Numpad2 => Some(0xFFB2),      // XK_KP_2
+        HidKeyCode::Numpad3 => Some(0xFFB3),      // XK_KP_3
+        HidKeyCode::Numpad4 => Some(0xFFB4),      // XK_KP_4
+        HidKeyCode::Numpad5 => Some(0xFFB5),      // XK_KP_5
+        HidKeyCode::Numpad6 => Some(0xFFB6),      // XK_KP_6
+        HidKeyCode::Numpad7 => Some(0xFFB7),      // XK_KP_7
+        HidKeyCode::Numpad8 => Some(0xFFB8),      // XK_KP_8
+        HidKeyCode::Numpad9 => Some(0xFFB9),      // XK_KP_9
+        HidKeyCode::NumpadDecimal => Some(0xFFAE), // XK_KP_Decimal
 
         // Punctuation / symbols
         HidKeyCode::Minus => Some(0x002D),        // XK_minus
@@ -151,14 +151,14 @@ pub fn hid_to_keysym(hid: HidKeyCode) -> Option<u32> {
         HidKeyCode::Slash => Some(0x002F),        // XK_slash
 
         // Modifier keys
-        HidKeyCode::ControlLeft => Some(0xFFE3),  // XK_Control_L
+        HidKeyCode::ControlLeft => Some(0xFFE3), // XK_Control_L
         HidKeyCode::ControlRight => Some(0xFFE4), // XK_Control_R
-        HidKeyCode::ShiftLeft => Some(0xFFE1),    // XK_Shift_L
-        HidKeyCode::ShiftRight => Some(0xFFE2),   // XK_Shift_R
-        HidKeyCode::AltLeft => Some(0xFFE9),      // XK_Alt_L
-        HidKeyCode::AltRight => Some(0xFFEA),     // XK_Alt_R
-        HidKeyCode::MetaLeft => Some(0xFFEB),     // XK_Super_L
-        HidKeyCode::MetaRight => Some(0xFFEC),    // XK_Super_R
+        HidKeyCode::ShiftLeft => Some(0xFFE1),   // XK_Shift_L
+        HidKeyCode::ShiftRight => Some(0xFFE2),  // XK_Shift_R
+        HidKeyCode::AltLeft => Some(0xFFE9),     // XK_Alt_L
+        HidKeyCode::AltRight => Some(0xFFEA),    // XK_Alt_R
+        HidKeyCode::MetaLeft => Some(0xFFEB),    // XK_Super_L
+        HidKeyCode::MetaRight => Some(0xFFEC),   // XK_Super_R
 
         HidKeyCode::Unknown => None,
     }
@@ -171,13 +171,32 @@ mod tests {
     #[test]
     fn test_all_letter_keys_have_x11_mappings() {
         let letters = [
-            HidKeyCode::KeyA, HidKeyCode::KeyB, HidKeyCode::KeyC, HidKeyCode::KeyD,
-            HidKeyCode::KeyE, HidKeyCode::KeyF, HidKeyCode::KeyG, HidKeyCode::KeyH,
-            HidKeyCode::KeyI, HidKeyCode::KeyJ, HidKeyCode::KeyK, HidKeyCode::KeyL,
-            HidKeyCode::KeyM, HidKeyCode::KeyN, HidKeyCode::KeyO, HidKeyCode::KeyP,
-            HidKeyCode::KeyQ, HidKeyCode::KeyR, HidKeyCode::KeyS, HidKeyCode::KeyT,
-            HidKeyCode::KeyU, HidKeyCode::KeyV, HidKeyCode::KeyW, HidKeyCode::KeyX,
-            HidKeyCode::KeyY, HidKeyCode::KeyZ,
+            HidKeyCode::KeyA,
+            HidKeyCode::KeyB,
+            HidKeyCode::KeyC,
+            HidKeyCode::KeyD,
+            HidKeyCode::KeyE,
+            HidKeyCode::KeyF,
+            HidKeyCode::KeyG,
+            HidKeyCode::KeyH,
+            HidKeyCode::KeyI,
+            HidKeyCode::KeyJ,
+            HidKeyCode::KeyK,
+            HidKeyCode::KeyL,
+            HidKeyCode::KeyM,
+            HidKeyCode::KeyN,
+            HidKeyCode::KeyO,
+            HidKeyCode::KeyP,
+            HidKeyCode::KeyQ,
+            HidKeyCode::KeyR,
+            HidKeyCode::KeyS,
+            HidKeyCode::KeyT,
+            HidKeyCode::KeyU,
+            HidKeyCode::KeyV,
+            HidKeyCode::KeyW,
+            HidKeyCode::KeyX,
+            HidKeyCode::KeyY,
+            HidKeyCode::KeyZ,
         ];
         for letter in letters {
             let result = hid_to_keysym(letter);
@@ -188,35 +207,63 @@ mod tests {
     #[test]
     fn test_all_digit_keys_have_x11_mappings() {
         for digit in [
-            HidKeyCode::Digit0, HidKeyCode::Digit1, HidKeyCode::Digit2,
-            HidKeyCode::Digit3, HidKeyCode::Digit4, HidKeyCode::Digit5,
-            HidKeyCode::Digit6, HidKeyCode::Digit7, HidKeyCode::Digit8,
+            HidKeyCode::Digit0,
+            HidKeyCode::Digit1,
+            HidKeyCode::Digit2,
+            HidKeyCode::Digit3,
+            HidKeyCode::Digit4,
+            HidKeyCode::Digit5,
+            HidKeyCode::Digit6,
+            HidKeyCode::Digit7,
+            HidKeyCode::Digit8,
             HidKeyCode::Digit9,
         ] {
-            assert!(hid_to_keysym(digit).is_some(), "{digit:?} should have an X11 keysym");
+            assert!(
+                hid_to_keysym(digit).is_some(),
+                "{digit:?} should have an X11 keysym"
+            );
         }
     }
 
     #[test]
     fn test_all_function_keys_have_x11_mappings() {
         for fkey in [
-            HidKeyCode::F1, HidKeyCode::F2, HidKeyCode::F3, HidKeyCode::F4,
-            HidKeyCode::F5, HidKeyCode::F6, HidKeyCode::F7, HidKeyCode::F8,
-            HidKeyCode::F9, HidKeyCode::F10, HidKeyCode::F11, HidKeyCode::F12,
+            HidKeyCode::F1,
+            HidKeyCode::F2,
+            HidKeyCode::F3,
+            HidKeyCode::F4,
+            HidKeyCode::F5,
+            HidKeyCode::F6,
+            HidKeyCode::F7,
+            HidKeyCode::F8,
+            HidKeyCode::F9,
+            HidKeyCode::F10,
+            HidKeyCode::F11,
+            HidKeyCode::F12,
         ] {
-            assert!(hid_to_keysym(fkey).is_some(), "{fkey:?} should have an X11 keysym");
+            assert!(
+                hid_to_keysym(fkey).is_some(),
+                "{fkey:?} should have an X11 keysym"
+            );
         }
     }
 
     #[test]
     fn test_all_modifier_keys_have_x11_mappings() {
         for modifier in [
-            HidKeyCode::ControlLeft, HidKeyCode::ControlRight,
-            HidKeyCode::ShiftLeft, HidKeyCode::ShiftRight,
-            HidKeyCode::AltLeft, HidKeyCode::AltRight,
-            HidKeyCode::MetaLeft, HidKeyCode::MetaRight,
+            HidKeyCode::ControlLeft,
+            HidKeyCode::ControlRight,
+            HidKeyCode::ShiftLeft,
+            HidKeyCode::ShiftRight,
+            HidKeyCode::AltLeft,
+            HidKeyCode::AltRight,
+            HidKeyCode::MetaLeft,
+            HidKeyCode::MetaRight,
         ] {
-            assert!(hid_to_keysym(modifier).is_some(), "{modifier:?} should have an X11 keysym");
+            assert!(
+                hid_to_keysym(modifier).is_some(),
+                "{modifier:?} should have an X11 keysym"
+            );
         }
     }
 
@@ -246,10 +293,7 @@ mod tests {
     #[test]
     fn test_letter_keysyms_are_lowercase_ascii() {
         // X11 keysyms for letters use lowercase ASCII values (0x61–0x7A)
-        let pairs = [
-            (HidKeyCode::KeyA, 0x0061u32),
-            (HidKeyCode::KeyZ, 0x007A),
-        ];
+        let pairs = [(HidKeyCode::KeyA, 0x0061u32), (HidKeyCode::KeyZ, 0x007A)];
         for (hid, expected) in pairs {
             assert_eq!(hid_to_keysym(hid), Some(expected));
         }
@@ -271,7 +315,10 @@ mod tests {
             HidKeyCode::NumLock,
             HidKeyCode::ContextMenu,
         ] {
-            assert!(hid_to_keysym(key).is_some(), "{key:?} should have an X11 keysym");
+            assert!(
+                hid_to_keysym(key).is_some(),
+                "{key:?} should have an X11 keysym"
+            );
         }
     }
 }

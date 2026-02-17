@@ -36,8 +36,8 @@ pub mod protocol;
 // Re-export the most-used types at the crate root so callers can write
 // `kvm_core::VirtualLayout` instead of `kvm_core::domain::layout::VirtualLayout`.
 pub use domain::layout::{
-    Adjacency, ClientId, ClientScreen, CursorLocation, Edge, EdgeTransition, LayoutError,
-    ScreenId, ScreenRegion, VirtualLayout,
+    Adjacency, ClientId, ClientScreen, CursorLocation, Edge, EdgeTransition, LayoutError, ScreenId,
+    ScreenRegion, VirtualLayout,
 };
 pub use keymap::hid::HidKeyCode;
 pub use protocol::codec::{decode_message, encode_message, ProtocolError};

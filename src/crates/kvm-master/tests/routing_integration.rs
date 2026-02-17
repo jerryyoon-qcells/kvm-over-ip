@@ -133,9 +133,14 @@ fn test_client_registry_upsert_and_retrieve() {
     registry.upsert(state.clone());
 
     // Retrieve it and check individual fields.
-    let retrieved = registry.get(id).expect("client must be present after upsert");
+    let retrieved = registry
+        .get(id)
+        .expect("client must be present after upsert");
     assert_eq!(retrieved.name, "test-client");
-    assert!(matches!(retrieved.connection_state, ConnectionState::Discovered));
+    assert!(matches!(
+        retrieved.connection_state,
+        ConnectionState::Discovered
+    ));
 }
 
 /// Tests that `ClientRegistry::remove` deletes a client record so that a
@@ -166,7 +171,10 @@ fn test_client_registry_remove() {
     registry.remove(id);
 
     // After removal, get() must return None.
-    assert!(registry.get(id).is_none(), "client must be absent after remove");
+    assert!(
+        registry.get(id).is_none(),
+        "client must be absent after remove"
+    );
 }
 
 /// Tests the full pairing lifecycle: initiate → verify with correct hash →

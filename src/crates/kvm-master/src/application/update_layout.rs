@@ -15,9 +15,7 @@
 //! This saves the user from having to manually configure adjacencies: just
 //! position screens correctly and the connections are inferred automatically.
 
-use kvm_core::{
-    domain::layout::{Adjacency, ClientId, ClientScreen, LayoutError, ScreenRegion, VirtualLayout},
-};
+use kvm_core::domain::layout::{Adjacency, ClientId, ClientScreen, ScreenRegion, VirtualLayout};
 use thiserror::Error;
 
 /// Error type for layout update operations.
@@ -86,8 +84,10 @@ fn detect_and_add_adjacencies(layout: &mut VirtualLayout) {
     for client in &clients {
         if master.right() == client.region.virtual_x
             && ranges_overlap(
-                master.virtual_y, master.virtual_y + master.height as i32,
-                client.region.virtual_y, client.region.virtual_y + client.region.height as i32,
+                master.virtual_y,
+                master.virtual_y + master.height as i32,
+                client.region.virtual_y,
+                client.region.virtual_y + client.region.height as i32,
             )
         {
             let _ = layout.set_adjacency(Adjacency {
@@ -107,8 +107,10 @@ fn detect_and_add_adjacencies(layout: &mut VirtualLayout) {
         // Check master left edge
         if master.virtual_x == client.region.right()
             && ranges_overlap(
-                master.virtual_y, master.virtual_y + master.height as i32,
-                client.region.virtual_y, client.region.virtual_y + client.region.height as i32,
+                master.virtual_y,
+                master.virtual_y + master.height as i32,
+                client.region.virtual_y,
+                client.region.virtual_y + client.region.height as i32,
             )
         {
             let _ = layout.set_adjacency(Adjacency {
@@ -122,8 +124,10 @@ fn detect_and_add_adjacencies(layout: &mut VirtualLayout) {
         // Check master bottom edge
         if master.bottom() == client.region.virtual_y
             && ranges_overlap(
-                master.virtual_x, master.right(),
-                client.region.virtual_x, client.region.right(),
+                master.virtual_x,
+                master.right(),
+                client.region.virtual_x,
+                client.region.right(),
             )
         {
             let _ = layout.set_adjacency(Adjacency {
@@ -137,8 +141,10 @@ fn detect_and_add_adjacencies(layout: &mut VirtualLayout) {
         // Check master top edge
         if master.virtual_y == client.region.bottom()
             && ranges_overlap(
-                master.virtual_x, master.right(),
-                client.region.virtual_x, client.region.right(),
+                master.virtual_x,
+                master.right(),
+                client.region.virtual_x,
+                client.region.right(),
             )
         {
             let _ = layout.set_adjacency(Adjacency {
@@ -206,7 +212,10 @@ mod tests {
             height: 1080,
         };
         let result = build_layout(1920, 1080, vec![c1, c2]);
-        assert!(matches!(result, Err(UpdateLayoutError::ValidationFailed(_))));
+        assert!(matches!(
+            result,
+            Err(UpdateLayoutError::ValidationFailed(_))
+        ));
     }
 
     #[test]

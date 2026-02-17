@@ -105,7 +105,10 @@ mod tests {
 
         // Assert
         let event = rx.recv().expect("should receive event");
-        assert!(matches!(event, RawInputEvent::KeyDown { vk_code: 0x41, .. }));
+        assert!(matches!(
+            event,
+            RawInputEvent::KeyDown { vk_code: 0x41, .. }
+        ));
     }
 
     #[test]
@@ -144,7 +147,11 @@ mod tests {
         let rx = source.start().expect("start should succeed");
 
         // Act
-        source.inject_event(RawInputEvent::MouseMove { x: 100, y: 200, time_ms: 1 });
+        source.inject_event(RawInputEvent::MouseMove {
+            x: 100,
+            y: 200,
+            time_ms: 1,
+        });
         source.inject_event(RawInputEvent::MouseButtonDown {
             button: MouseButton::Left,
             x: 100,
@@ -159,11 +166,20 @@ mod tests {
         });
 
         // Assert
-        assert!(matches!(rx.recv().unwrap(), RawInputEvent::MouseMove { x: 100, .. }));
         assert!(matches!(
             rx.recv().unwrap(),
-            RawInputEvent::MouseButtonDown { button: MouseButton::Left, .. }
+            RawInputEvent::MouseMove { x: 100, .. }
         ));
-        assert!(matches!(rx.recv().unwrap(), RawInputEvent::MouseWheel { delta: 120, .. }));
+        assert!(matches!(
+            rx.recv().unwrap(),
+            RawInputEvent::MouseButtonDown {
+                button: MouseButton::Left,
+                ..
+            }
+        ));
+        assert!(matches!(
+            rx.recv().unwrap(),
+            RawInputEvent::MouseWheel { delta: 120, .. }
+        ));
     }
 }

@@ -207,8 +207,8 @@ pub fn decode_message(bytes: &[u8]) -> Result<(KvmMessage, usize), ProtocolError
     }
 
     let msg_type_byte = bytes[1];
-    let msg_type =
-        MessageType::try_from(msg_type_byte).map_err(|_| ProtocolError::UnknownMessageType(msg_type_byte))?;
+    let msg_type = MessageType::try_from(msg_type_byte)
+        .map_err(|_| ProtocolError::UnknownMessageType(msg_type_byte))?;
 
     // bytes[2..4] are reserved – ignored on decode
 
@@ -283,8 +283,12 @@ fn decode_payload(msg_type: MessageType, payload: &[u8]) -> Result<KvmMessage, P
         }
         MessageType::Disconnect => {
             require_len(payload, 1, "Disconnect")?;
-            let reason = DisconnectReason::try_from(payload[0])
-                .map_err(|_| ProtocolError::MalformedPayload(format!("unknown disconnect reason: {}", payload[0])))?;
+            let reason = DisconnectReason::try_from(payload[0]).map_err(|_| {
+                ProtocolError::MalformedPayload(format!(
+                    "unknown disconnect reason: {}",
+                    payload[0]
+                ))
+            })?;
             Ok(KvmMessage::Disconnect { reason })
         }
         MessageType::Error => decode_error(payload).map(KvmMessage::Error),
@@ -473,7 +477,12 @@ fn decode_hello(p: &[u8]) -> Result<HelloMessage, ProtocolError> {
     let (client_name, name_end) = read_length_prefixed_string(p, 18)?;
     let caps_off = name_end;
     require_len(p, caps_off + 4, "Hello.capabilities")?;
-    let capabilities = u32::from_be_bytes([p[caps_off], p[caps_off + 1], p[caps_off + 2], p[caps_off + 3]]);
+    let capabilities = u32::from_be_bytes([
+        p[caps_off],
+        p[caps_off + 1],
+        p[caps_off + 2],
+        p[caps_off + 3],
+    ]);
     Ok(HelloMessage {
         client_id,
         protocol_version,
@@ -533,12 +542,12 @@ fn decode_screen_info(p: &[u8]) -> Result<ScreenInfoMessage, ProtocolError> {
     let mut off = 1;
     for _ in 0..monitor_count {
         let monitor_id = p[off];
-        let x_offset = i32::from_be_bytes([p[off+1], p[off+2], p[off+3], p[off+4]]);
-        let y_offset = i32::from_be_bytes([p[off+5], p[off+6], p[off+7], p[off+8]]);
-        let width = u32::from_be_bytes([p[off+9], p[off+10], p[off+11], p[off+12]]);
-        let height = u32::from_be_bytes([p[off+13], p[off+14], p[off+15], p[off+16]]);
-        let scale_factor = u16::from_be_bytes([p[off+17], p[off+18]]);
-        let is_primary = p[off+19] != 0;
+        let x_offset = i32::from_be_bytes([p[off + 1], p[off + 2], p[off + 3], p[off + 4]]);
+        let y_offset = i32::from_be_bytes([p[off + 5], p[off + 6], p[off + 7], p[off + 8]]);
+        let width = u32::from_be_bytes([p[off + 9], p[off + 10], p[off + 11], p[off + 12]]);
+        let height = u32::from_be_bytes([p[off + 13], p[off + 14], p[off + 15], p[off + 16]]);
+        let scale_factor = u16::from_be_bytes([p[off + 17], p[off + 18]]);
+        let is_primary = p[off + 19] != 0;
         monitors.push(MonitorInfo {
             monitor_id,
             x_offset,
@@ -567,14 +576,18 @@ fn decode_error(p: &[u8]) -> Result<ErrorMessage, ProtocolError> {
         _ => ProtocolErrorCode::InternalError,
     };
     let (description, _) = read_length_prefixed_string(p, 1)?;
-    Ok(ErrorMessage { error_code, description })
+    Ok(ErrorMessage {
+        error_code,
+        description,
+    })
 }
 
 fn decode_clipboard_data(p: &[u8]) -> Result<ClipboardDataMessage, ProtocolError> {
     // 1 (format) + 4 (data_len) + data + 1 (has_more)
     require_len(p, 6, "ClipboardData")?;
-    let format = ClipboardFormat::try_from(p[0])
-        .map_err(|_| ProtocolError::MalformedPayload(format!("unknown clipboard format: {}", p[0])))?;
+    let format = ClipboardFormat::try_from(p[0]).map_err(|_| {
+        ProtocolError::MalformedPayload(format!("unknown clipboard format: {}", p[0]))
+    })?;
     let data_len = u32::from_be_bytes([p[1], p[2], p[3], p[4]]) as usize;
     require_len(p, 1 + 4 + data_len + 1, "ClipboardData.data")?;
     let data = p[5..5 + data_len].to_vec();
@@ -635,8 +648,9 @@ fn decode_key_event(p: &[u8]) -> Result<KeyEventMessage, ProtocolError> {
     let key_code_raw = u16::from_be_bytes([p[0], p[1]]);
     let key_code = HidKeyCode::from_u16(key_code_raw);
     let scan_code = u16::from_be_bytes([p[2], p[3]]);
-    let event_type = KeyEventType::try_from(p[4])
-        .map_err(|_| ProtocolError::MalformedPayload(format!("unknown key event type: {}", p[4])))?;
+    let event_type = KeyEventType::try_from(p[4]).map_err(|_| {
+        ProtocolError::MalformedPayload(format!("unknown key event type: {}", p[4]))
+    })?;
     let modifiers = ModifierFlags(p[5]);
     Ok(KeyEventMessage {
         key_code,
@@ -653,7 +667,12 @@ fn decode_mouse_move(p: &[u8]) -> Result<MouseMoveMessage, ProtocolError> {
     let y = i32::from_be_bytes([p[4], p[5], p[6], p[7]]);
     let delta_x = i16::from_be_bytes([p[8], p[9]]);
     let delta_y = i16::from_be_bytes([p[10], p[11]]);
-    Ok(MouseMoveMessage { x, y, delta_x, delta_y })
+    Ok(MouseMoveMessage {
+        x,
+        y,
+        delta_x,
+        delta_y,
+    })
 }
 
 fn decode_mouse_button(p: &[u8]) -> Result<MouseButtonMessage, ProtocolError> {
@@ -661,11 +680,17 @@ fn decode_mouse_button(p: &[u8]) -> Result<MouseButtonMessage, ProtocolError> {
     require_len(p, 10, "MouseButton")?;
     let button = MouseButton::try_from(p[0])
         .map_err(|_| ProtocolError::MalformedPayload(format!("unknown mouse button: {}", p[0])))?;
-    let event_type = ButtonEventType::try_from(p[1])
-        .map_err(|_| ProtocolError::MalformedPayload(format!("unknown button event type: {}", p[1])))?;
+    let event_type = ButtonEventType::try_from(p[1]).map_err(|_| {
+        ProtocolError::MalformedPayload(format!("unknown button event type: {}", p[1]))
+    })?;
     let x = i32::from_be_bytes([p[2], p[3], p[4], p[5]]);
     let y = i32::from_be_bytes([p[6], p[7], p[8], p[9]]);
-    Ok(MouseButtonMessage { button, event_type, x, y })
+    Ok(MouseButtonMessage {
+        button,
+        event_type,
+        x,
+        y,
+    })
 }
 
 fn decode_mouse_scroll(p: &[u8]) -> Result<MouseScrollMessage, ProtocolError> {
@@ -675,7 +700,12 @@ fn decode_mouse_scroll(p: &[u8]) -> Result<MouseScrollMessage, ProtocolError> {
     let delta_y = i16::from_be_bytes([p[2], p[3]]);
     let x = i32::from_be_bytes([p[4], p[5], p[6], p[7]]);
     let y = i32::from_be_bytes([p[8], p[9], p[10], p[11]]);
-    Ok(MouseScrollMessage { delta_x, delta_y, x, y })
+    Ok(MouseScrollMessage {
+        delta_x,
+        delta_y,
+        x,
+        y,
+    })
 }
 
 fn decode_input_batch(p: &[u8]) -> Result<Vec<InputEvent>, ProtocolError> {
@@ -796,7 +826,9 @@ fn read_uuid(buf: &[u8], offset: usize) -> Result<Uuid, ProtocolError> {
             buf.len().saturating_sub(offset)
         )));
     }
-    Ok(Uuid::from_bytes(buf[offset..offset + 16].try_into().unwrap()))
+    Ok(Uuid::from_bytes(
+        buf[offset..offset + 16].try_into().unwrap(),
+    ))
 }
 
 /// Writes a 2-byte length prefix followed by the UTF-8 string bytes.
@@ -828,7 +860,10 @@ fn write_length_prefixed_string(buf: &mut Vec<u8>, s: &str) {
 /// - Fewer than 2 bytes are available for the length prefix.
 /// - The declared string length exceeds the remaining buffer.
 /// - The bytes are not valid UTF-8.
-fn read_length_prefixed_string(buf: &[u8], offset: usize) -> Result<(String, usize), ProtocolError> {
+fn read_length_prefixed_string(
+    buf: &[u8],
+    offset: usize,
+) -> Result<(String, usize), ProtocolError> {
     if buf.len() < offset + 2 {
         return Err(ProtocolError::MalformedPayload(format!(
             "need 2 bytes for string length at offset {offset}"
@@ -859,7 +894,11 @@ mod tests {
     fn round_trip(msg: &KvmMessage) -> KvmMessage {
         let encoded = encode_message(msg, 0, 0).expect("encode failed");
         let (decoded, consumed) = decode_message(&encoded).expect("decode failed");
-        assert_eq!(consumed, encoded.len(), "consumed bytes should equal total encoded size");
+        assert_eq!(
+            consumed,
+            encoded.len(),
+            "consumed bytes should equal total encoded size"
+        );
         decoded
     }
 
@@ -1152,7 +1191,10 @@ mod tests {
 
         // Assert: byte[1] of the header is the message type — must be 0x0C.
         // This confirms the variant is wired to the correct MessageType discriminant.
-        assert_eq!(bytes[1], 0x0C, "ConfigUpdate must encode with message type 0x0C");
+        assert_eq!(
+            bytes[1], 0x0C,
+            "ConfigUpdate must encode with message type 0x0C"
+        );
     }
 
     #[test]
@@ -1162,7 +1204,7 @@ mod tests {
         let mut bytes = vec![0u8; 24 + 2]; // header + 2-byte payload
         bytes[0] = PROTOCOL_VERSION;
         bytes[1] = 0x0C; // ConfigUpdate
-        // payload_length field is bytes[4..8]
+                         // payload_length field is bytes[4..8]
         let payload_len = 2u32;
         bytes[4..8].copy_from_slice(&payload_len.to_be_bytes());
         // Remaining bytes are zero (the "payload"), which is only 2 bytes.
@@ -1380,13 +1422,19 @@ mod tests {
     #[test]
     fn test_decode_empty_bytes_returns_insufficient_data() {
         let result = decode_message(&[]);
-        assert!(matches!(result, Err(ProtocolError::InsufficientData { .. })));
+        assert!(matches!(
+            result,
+            Err(ProtocolError::InsufficientData { .. })
+        ));
     }
 
     #[test]
     fn test_decode_truncated_header_returns_insufficient_data() {
         let result = decode_message(&[0x01, 0x07]); // only 2 bytes
-        assert!(matches!(result, Err(ProtocolError::InsufficientData { .. })));
+        assert!(matches!(
+            result,
+            Err(ProtocolError::InsufficientData { .. })
+        ));
     }
 
     #[test]
@@ -1394,9 +1442,12 @@ mod tests {
         let mut bytes = vec![0u8; 24];
         bytes[0] = PROTOCOL_VERSION;
         bytes[1] = 0xFF; // unknown type
-        // payload_length = 0, so no payload needed
+                         // payload_length = 0, so no payload needed
         let result = decode_message(&bytes);
-        assert!(matches!(result, Err(ProtocolError::UnknownMessageType(0xFF))));
+        assert!(matches!(
+            result,
+            Err(ProtocolError::UnknownMessageType(0xFF))
+        ));
     }
 
     #[test]
@@ -1405,7 +1456,10 @@ mod tests {
         bytes[0] = 0x99; // wrong version
         bytes[1] = MessageType::Ping as u8;
         let result = decode_message(&bytes);
-        assert!(matches!(result, Err(ProtocolError::UnsupportedVersion(0x99))));
+        assert!(matches!(
+            result,
+            Err(ProtocolError::UnsupportedVersion(0x99))
+        ));
     }
 
     #[test]
@@ -1416,7 +1470,10 @@ mod tests {
         // Declare 100 bytes of payload, but provide none
         bytes[4..8].copy_from_slice(&100u32.to_be_bytes());
         let result = decode_message(&bytes);
-        assert!(matches!(result, Err(ProtocolError::PayloadLengthMismatch { .. })));
+        assert!(matches!(
+            result,
+            Err(ProtocolError::PayloadLengthMismatch { .. })
+        ));
     }
 
     #[test]

@@ -162,12 +162,20 @@ pub struct ClientCommandResult<T: Serialize> {
 impl<T: Serialize> ClientCommandResult<T> {
     /// Constructs a successful result containing `data`.
     pub fn ok(data: T) -> Self {
-        Self { success: true, data: Some(data), error: None }
+        Self {
+            success: true,
+            data: Some(data),
+            error: None,
+        }
     }
 
     /// Constructs an error result containing the given message.
     pub fn err(msg: impl Into<String>) -> Self {
-        Self { success: false, data: None, error: Some(msg.into()) }
+        Self {
+            success: false,
+            data: None,
+            error: Some(msg.into()),
+        }
     }
 }
 

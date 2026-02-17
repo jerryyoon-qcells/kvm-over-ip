@@ -326,9 +326,8 @@ impl VirtualLayout {
         self.validate_screen_id(&adj.to_screen)?;
 
         // Replace any existing adjacency for the same from_screen + from_edge pair
-        self.adjacencies.retain(|a| {
-            !(a.from_screen == adj.from_screen && a.from_edge == adj.from_edge)
-        });
+        self.adjacencies
+            .retain(|a| !(a.from_screen == adj.from_screen && a.from_edge == adj.from_edge));
         self.adjacencies.push(adj);
         Ok(())
     }
@@ -461,9 +460,9 @@ impl VirtualLayout {
             // edge closest to the transition side, so any subsequent movement
             // must travel across the whole screen before it could trigger again.
             let (master_teleport_x, master_teleport_y) = match adj.from_edge {
-                Edge::Right => (1, local_y),                           // teleport to left side
+                Edge::Right => (1, local_y), // teleport to left side
                 Edge::Left => (from_region.width as i32 - 2, local_y), // teleport to right side
-                Edge::Bottom => (local_x, 1),                          // teleport to top side
+                Edge::Bottom => (local_x, 1), // teleport to top side
                 Edge::Top => (local_x, from_region.height as i32 - 2), // teleport to bottom side
             };
 
@@ -550,34 +549,74 @@ mod tests {
 
     #[test]
     fn test_screen_region_right_returns_virtual_x_plus_width() {
-        let region = ScreenRegion { virtual_x: 100, virtual_y: 0, width: 1920, height: 1080 };
+        let region = ScreenRegion {
+            virtual_x: 100,
+            virtual_y: 0,
+            width: 1920,
+            height: 1080,
+        };
         assert_eq!(region.right(), 2020);
     }
 
     #[test]
     fn test_screen_region_bottom_returns_virtual_y_plus_height() {
-        let region = ScreenRegion { virtual_x: 0, virtual_y: 50, width: 1920, height: 1080 };
+        let region = ScreenRegion {
+            virtual_x: 0,
+            virtual_y: 50,
+            width: 1920,
+            height: 1080,
+        };
         assert_eq!(region.bottom(), 1130);
     }
 
     #[test]
     fn test_screen_region_overlaps_when_regions_share_area() {
-        let a = ScreenRegion { virtual_x: 0, virtual_y: 0, width: 100, height: 100 };
-        let b = ScreenRegion { virtual_x: 50, virtual_y: 50, width: 100, height: 100 };
+        let a = ScreenRegion {
+            virtual_x: 0,
+            virtual_y: 0,
+            width: 100,
+            height: 100,
+        };
+        let b = ScreenRegion {
+            virtual_x: 50,
+            virtual_y: 50,
+            width: 100,
+            height: 100,
+        };
         assert!(a.overlaps(&b));
     }
 
     #[test]
     fn test_screen_region_does_not_overlap_when_adjacent() {
-        let a = ScreenRegion { virtual_x: 0, virtual_y: 0, width: 100, height: 100 };
-        let b = ScreenRegion { virtual_x: 100, virtual_y: 0, width: 100, height: 100 };
+        let a = ScreenRegion {
+            virtual_x: 0,
+            virtual_y: 0,
+            width: 100,
+            height: 100,
+        };
+        let b = ScreenRegion {
+            virtual_x: 100,
+            virtual_y: 0,
+            width: 100,
+            height: 100,
+        };
         assert!(!a.overlaps(&b));
     }
 
     #[test]
     fn test_screen_region_does_not_overlap_when_separated() {
-        let a = ScreenRegion { virtual_x: 0, virtual_y: 0, width: 100, height: 100 };
-        let b = ScreenRegion { virtual_x: 200, virtual_y: 200, width: 100, height: 100 };
+        let a = ScreenRegion {
+            virtual_x: 0,
+            virtual_y: 0,
+            width: 100,
+            height: 100,
+        };
+        let b = ScreenRegion {
+            virtual_x: 200,
+            virtual_y: 200,
+            width: 100,
+            height: 100,
+        };
         assert!(!a.overlaps(&b));
     }
 
@@ -643,21 +682,39 @@ mod tests {
     fn test_resolve_cursor_returns_on_master_when_within_master_region() {
         let layout = make_layout(1920, 1080);
         let loc = layout.resolve_cursor(960, 540);
-        assert_eq!(loc, CursorLocation::OnMaster { local_x: 960, local_y: 540 });
+        assert_eq!(
+            loc,
+            CursorLocation::OnMaster {
+                local_x: 960,
+                local_y: 540
+            }
+        );
     }
 
     #[test]
     fn test_resolve_cursor_returns_on_master_at_origin() {
         let layout = make_layout(1920, 1080);
         let loc = layout.resolve_cursor(0, 0);
-        assert_eq!(loc, CursorLocation::OnMaster { local_x: 0, local_y: 0 });
+        assert_eq!(
+            loc,
+            CursorLocation::OnMaster {
+                local_x: 0,
+                local_y: 0
+            }
+        );
     }
 
     #[test]
     fn test_resolve_cursor_returns_on_master_at_bottom_right_corner() {
         let layout = make_layout(1920, 1080);
         let loc = layout.resolve_cursor(1919, 1079); // last pixel inside master
-        assert_eq!(loc, CursorLocation::OnMaster { local_x: 1919, local_y: 1079 });
+        assert_eq!(
+            loc,
+            CursorLocation::OnMaster {
+                local_x: 1919,
+                local_y: 1079
+            }
+        );
     }
 
     #[test]
@@ -704,7 +761,10 @@ mod tests {
             .unwrap();
 
         let result = layout.check_edge_transition(&ScreenId::Master, 960, 540);
-        assert!(result.is_none(), "cursor far from edge should not trigger transition");
+        assert!(
+            result.is_none(),
+            "cursor far from edge should not trigger transition"
+        );
     }
 
     #[test]
@@ -724,7 +784,10 @@ mod tests {
 
         // Cursor is within EDGE_THRESHOLD (2px) of the right edge
         let result = layout.check_edge_transition(&ScreenId::Master, 1919, 540);
-        assert!(result.is_some(), "cursor within threshold of right edge should trigger transition");
+        assert!(
+            result.is_some(),
+            "cursor within threshold of right edge should trigger transition"
+        );
     }
 
     #[test]
@@ -751,7 +814,10 @@ mod tests {
         assert_eq!(transition.to_screen, ScreenId::Client(cid));
         assert_eq!(transition.entry_x, 0, "entering left edge at x=0");
         // 540/1080 * 1440 = 720
-        assert_eq!(transition.entry_y, 720, "y should be proportionally mapped to 720");
+        assert_eq!(
+            transition.entry_y, 720,
+            "y should be proportionally mapped to 720"
+        );
     }
 
     #[test]

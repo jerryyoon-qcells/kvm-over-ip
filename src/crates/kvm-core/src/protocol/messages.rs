@@ -54,7 +54,7 @@ pub const HEADER_SIZE: usize = 24;
 /// For example, a Linux client needs X11 KeySym codes, while a Windows client
 /// needs Virtual Key codes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[repr(u8)]  // Store as a single byte on the wire.
+#[repr(u8)] // Store as a single byte on the wire.
 pub enum PlatformId {
     Windows = 0x01,
     Linux = 0x02,
@@ -842,7 +842,9 @@ pub enum KvmMessage {
     Ping(u64),
     /// Reply to a `Ping`; carries the same token that was in the Ping.
     Pong(u64),
-    Disconnect { reason: DisconnectReason },
+    Disconnect {
+        reason: DisconnectReason,
+    },
     Error(ErrorMessage),
     ClipboardData(ClipboardDataMessage),
     /// FIX (Bug 2): this variant was previously missing from the enum even though

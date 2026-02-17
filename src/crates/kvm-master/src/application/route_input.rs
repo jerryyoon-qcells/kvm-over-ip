@@ -36,16 +36,15 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use kvm_core::{
-    domain::layout::{CursorLocation, EdgeTransition, ScreenId, VirtualLayout},
+    domain::layout::{EdgeTransition, ScreenId, VirtualLayout},
     keymap::{hid::HidKeyCode, KeyMapper},
     protocol::messages::{
-        KeyEventMessage, KeyEventType, ModifierFlags, MouseButton as ProtoMouseButton,
-        MouseButtonMessage, MouseMoveMessage, MouseScrollMessage, ButtonEventType,
+        ButtonEventType, KeyEventMessage, KeyEventType, ModifierFlags,
+        MouseButton as ProtoMouseButton, MouseButtonMessage, MouseMoveMessage, MouseScrollMessage,
     },
     ClientId,
 };
 use thiserror::Error;
-use uuid::Uuid;
 
 use crate::infrastructure::input_capture::{MouseButton as RawMouseButton, RawInputEvent};
 
@@ -138,18 +137,13 @@ pub trait CursorController: Send + Sync {
 /// all input events are processed locally (not sent anywhere).  When the cursor
 /// crosses to a client screen, `ActiveTarget::Client(cid)` means events are
 /// serialised and transmitted to that client.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum ActiveTarget {
     /// Input goes to the local master system.
+    #[default]
     Master,
     /// Input is routed to the specified client.
     Client(ClientId),
-}
-
-impl Default for ActiveTarget {
-    fn default() -> Self {
-        ActiveTarget::Master
-    }
 }
 
 /// The current modifier key state maintained across key-down/up events.
@@ -179,14 +173,30 @@ impl ModifierState {
     /// Each `bool` field maps to one bit.  `true` sets the bit, `false` clears it.
     fn to_flags(self) -> ModifierFlags {
         let mut flags = 0u8;
-        if self.left_ctrl { flags |= ModifierFlags::LEFT_CTRL; }
-        if self.right_ctrl { flags |= ModifierFlags::RIGHT_CTRL; }
-        if self.left_shift { flags |= ModifierFlags::LEFT_SHIFT; }
-        if self.right_shift { flags |= ModifierFlags::RIGHT_SHIFT; }
-        if self.left_alt { flags |= ModifierFlags::LEFT_ALT; }
-        if self.right_alt { flags |= ModifierFlags::RIGHT_ALT; }
-        if self.left_meta { flags |= ModifierFlags::LEFT_META; }
-        if self.right_meta { flags |= ModifierFlags::RIGHT_META; }
+        if self.left_ctrl {
+            flags |= ModifierFlags::LEFT_CTRL;
+        }
+        if self.right_ctrl {
+            flags |= ModifierFlags::RIGHT_CTRL;
+        }
+        if self.left_shift {
+            flags |= ModifierFlags::LEFT_SHIFT;
+        }
+        if self.right_shift {
+            flags |= ModifierFlags::RIGHT_SHIFT;
+        }
+        if self.left_alt {
+            flags |= ModifierFlags::LEFT_ALT;
+        }
+        if self.right_alt {
+            flags |= ModifierFlags::RIGHT_ALT;
+        }
+        if self.left_meta {
+            flags |= ModifierFlags::LEFT_META;
+        }
+        if self.right_meta {
+            flags |= ModifierFlags::RIGHT_META;
+        }
         ModifierFlags(flags)
     }
 
@@ -229,8 +239,8 @@ pub struct RouteInputUseCase {
     last_transition: Option<Instant>,
     transmitter: Arc<dyn InputTransmitter>,
     cursor_controller: Arc<dyn CursorController>,
-    /// Sequence counter for outbound messages.
-    sequence: u64,
+    /// Sequence counter for outbound messages (reserved for future use).
+    _sequence: u64,
 }
 
 impl RouteInputUseCase {
@@ -252,7 +262,7 @@ impl RouteInputUseCase {
             last_transition: None,
             transmitter,
             cursor_controller,
-            sequence: 0,
+            _sequence: 0,
         }
     }
 
@@ -298,17 +308,13 @@ impl RouteInputUseCase {
     pub async fn handle_event(&mut self, event: RawInputEvent) -> Result<(), RouteError> {
         match event {
             RawInputEvent::KeyDown {
-                vk_code,
-                scan_code,
-                ..
+                vk_code, scan_code, ..
             } => {
                 self.modifiers.update(vk_code, true);
                 self.handle_key_down(vk_code, scan_code).await?;
             }
             RawInputEvent::KeyUp {
-                vk_code,
-                scan_code,
-                ..
+                vk_code, scan_code, ..
             } => {
                 self.modifiers.update(vk_code, false);
                 self.handle_key_up(vk_code, scan_code).await?;
@@ -423,7 +429,10 @@ impl RouteInputUseCase {
             .unwrap_or(true);
 
         if can_transition {
-            if let Some(transition) = self.layout.check_edge_transition(&current_screen, local_x, local_y) {
+            if let Some(transition) =
+                self.layout
+                    .check_edge_transition(&current_screen, local_x, local_y)
+            {
                 return self.apply_transition(transition).await;
             }
         }
@@ -454,10 +463,8 @@ impl RouteInputUseCase {
         };
 
         // Teleport the physical cursor to prevent it from straying off the master screen
-        self.cursor_controller.teleport_cursor(
-            transition.master_teleport_x,
-            transition.master_teleport_y,
-        );
+        self.cursor_controller
+            .teleport_cursor(transition.master_teleport_x, transition.master_teleport_y);
 
         // Send the entry position to the new target if it's a client
         if let ActiveTarget::Client(cid) = self.active_target.clone() {
@@ -523,7 +530,12 @@ impl RouteInputUseCase {
             return Ok(());
         }
         if let ActiveTarget::Client(cid) = self.active_target.clone() {
-            let event = MouseScrollMessage { delta_x, delta_y, x, y };
+            let event = MouseScrollMessage {
+                delta_x,
+                delta_y,
+                x,
+                y,
+            };
             self.transmitter
                 .send_mouse_scroll(cid, event)
                 .await
@@ -532,14 +544,11 @@ impl RouteInputUseCase {
         Ok(())
     }
 
-    /// Returns the current sequence number and advances the counter.
-    ///
-    /// `wrapping_add` prevents panics on overflow: when the counter reaches
-    /// u64::MAX the next call returns 0.  In practice the counter will never
-    /// overflow — at 1 million events per second it would take ~580,000 years.
+    /// Returns the current sequence number and advances the counter (reserved for future use).
+    #[allow(dead_code)]
     fn next_sequence(&mut self) -> u64 {
-        let seq = self.sequence;
-        self.sequence = self.sequence.wrapping_add(1);
+        let seq = self._sequence;
+        self._sequence = self._sequence.wrapping_add(1);
         seq
     }
 }

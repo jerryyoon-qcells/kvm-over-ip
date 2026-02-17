@@ -26,12 +26,11 @@
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use kvm_core::ClientId;
 use thiserror::Error;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::mpsc;
 use uuid::Uuid;
 
 /// Error type for connection management operations.
@@ -138,7 +137,7 @@ struct PairingSession {
 #[derive(Debug)]
 struct LockoutEntry {
     locked_until: Instant,
-    failed_attempts: u8,
+    _failed_attempts: u8,
 }
 
 const MAX_PIN_ATTEMPTS: u8 = 3;
@@ -150,11 +149,11 @@ const PAIRING_EXPIRY: Duration = Duration::from_secs(60);
 /// In the full implementation this would manage TLS listeners. For now
 /// it provides the state machine and pairing logic, which are fully testable.
 pub struct ConnectionManager {
-    config: NetworkConfig,
+    _config: NetworkConfig,
     pairing_sessions: HashMap<Uuid, PairingSession>,
     lockouts: HashMap<std::net::IpAddr, LockoutEntry>,
     paired_clients: HashMap<ClientId, String>, // client_id -> cert fingerprint
-    event_tx: mpsc::Sender<ConnectionEvent>,
+    _event_tx: mpsc::Sender<ConnectionEvent>,
 }
 
 impl ConnectionManager {
@@ -162,11 +161,11 @@ impl ConnectionManager {
     pub fn new(config: NetworkConfig) -> (Self, mpsc::Receiver<ConnectionEvent>) {
         let (tx, rx) = mpsc::channel(64);
         let mgr = Self {
-            config,
+            _config: config,
             pairing_sessions: HashMap::new(),
             lockouts: HashMap::new(),
             paired_clients: HashMap::new(),
-            event_tx: tx,
+            _event_tx: tx,
         };
         (mgr, rx)
     }
@@ -238,7 +237,7 @@ impl ConnectionManager {
                     client_addr,
                     LockoutEntry {
                         locked_until: Instant::now() + LOCKOUT_DURATION,
-                        failed_attempts: MAX_PIN_ATTEMPTS,
+                        _failed_attempts: MAX_PIN_ATTEMPTS,
                     },
                 );
                 self.pairing_sessions.remove(&session_id);
@@ -315,7 +314,10 @@ mod tests {
         let addr: std::net::IpAddr = "192.168.1.1".parse().unwrap();
         let (_session_id, pin) = mgr.initiate_pairing(client_id, addr).unwrap();
         assert_eq!(pin.len(), 6, "PIN must be exactly 6 digits");
-        assert!(pin.chars().all(|c| c.is_ascii_digit()), "PIN must contain only digits");
+        assert!(
+            pin.chars().all(|c| c.is_ascii_digit()),
+            "PIN must contain only digits"
+        );
     }
 
     #[test]

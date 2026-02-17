@@ -403,8 +403,7 @@ fn bench_roundtrip_hot_path(c: &mut Criterion) {
     let key_msg = make_key_event();
     group.bench_function("KeyEvent", |b| {
         b.iter(|| {
-            let bytes =
-                encode_message(black_box(&key_msg), black_box(1), black_box(0)).unwrap();
+            let bytes = encode_message(black_box(&key_msg), black_box(1), black_box(0)).unwrap();
             decode_message(black_box(&bytes)).unwrap()
         })
     });
@@ -413,8 +412,7 @@ fn bench_roundtrip_hot_path(c: &mut Criterion) {
     let mouse_msg = make_mouse_move();
     group.bench_function("MouseMove", |b| {
         b.iter(|| {
-            let bytes =
-                encode_message(black_box(&mouse_msg), black_box(1), black_box(0)).unwrap();
+            let bytes = encode_message(black_box(&mouse_msg), black_box(1), black_box(0)).unwrap();
             decode_message(black_box(&bytes)).unwrap()
         })
     });
@@ -423,8 +421,7 @@ fn bench_roundtrip_hot_path(c: &mut Criterion) {
     let batch_msg = make_input_batch_10();
     group.bench_function("InputBatch_10", |b| {
         b.iter(|| {
-            let bytes =
-                encode_message(black_box(&batch_msg), black_box(1), black_box(0)).unwrap();
+            let bytes = encode_message(black_box(&batch_msg), black_box(1), black_box(0)).unwrap();
             decode_message(black_box(&bytes)).unwrap()
         })
     });

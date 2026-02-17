@@ -75,20 +75,20 @@ pub fn hid_to_cgkeycode(hid: HidKeyCode) -> Option<u16> {
         HidKeyCode::Digit9 => Some(0x19), // kVK_ANSI_9
 
         // Control keys
-        HidKeyCode::Enter => Some(0x24),      // kVK_Return
-        HidKeyCode::Escape => Some(0x35),     // kVK_Escape
-        HidKeyCode::Backspace => Some(0x33),  // kVK_Delete
-        HidKeyCode::Tab => Some(0x30),        // kVK_Tab
-        HidKeyCode::Space => Some(0x31),      // kVK_Space
-        HidKeyCode::CapsLock => Some(0x39),   // kVK_CapsLock
-        HidKeyCode::ScrollLock => Some(0x6B), // kVK_F14 (mapped to ScrollLock)
-        HidKeyCode::Pause => Some(0x71),      // kVK_F15 (mapped to Pause)
-        HidKeyCode::Insert => Some(0x72),     // kVK_Help (insert on some keyboards)
-        HidKeyCode::Home => Some(0x73),       // kVK_Home
-        HidKeyCode::PageUp => Some(0x74),     // kVK_PageUp
-        HidKeyCode::Delete => Some(0x75),     // kVK_ForwardDelete
-        HidKeyCode::End => Some(0x77),        // kVK_End
-        HidKeyCode::PageDown => Some(0x79),   // kVK_PageDown
+        HidKeyCode::Enter => Some(0x24),       // kVK_Return
+        HidKeyCode::Escape => Some(0x35),      // kVK_Escape
+        HidKeyCode::Backspace => Some(0x33),   // kVK_Delete
+        HidKeyCode::Tab => Some(0x30),         // kVK_Tab
+        HidKeyCode::Space => Some(0x31),       // kVK_Space
+        HidKeyCode::CapsLock => Some(0x39),    // kVK_CapsLock
+        HidKeyCode::ScrollLock => Some(0x6B),  // kVK_F14 (mapped to ScrollLock)
+        HidKeyCode::Pause => Some(0x71),       // kVK_F15 (mapped to Pause)
+        HidKeyCode::Insert => Some(0x72),      // kVK_Help (insert on some keyboards)
+        HidKeyCode::Home => Some(0x73),        // kVK_Home
+        HidKeyCode::PageUp => Some(0x74),      // kVK_PageUp
+        HidKeyCode::Delete => Some(0x75),      // kVK_ForwardDelete
+        HidKeyCode::End => Some(0x77),         // kVK_End
+        HidKeyCode::PageDown => Some(0x79),    // kVK_PageDown
         HidKeyCode::PrintScreen => Some(0x69), // kVK_F13
         HidKeyCode::ContextMenu => Some(0x6E), // (no direct equivalent; using kVK_F15 region)
 
@@ -113,23 +113,23 @@ pub fn hid_to_cgkeycode(hid: HidKeyCode) -> Option<u16> {
         HidKeyCode::F12 => Some(0x6F), // kVK_F12
 
         // Numpad
-        HidKeyCode::NumLock => Some(0x47),        // kVK_ANSI_KeypadClear (NumLock on Mac)
-        HidKeyCode::NumpadDivide => Some(0x4B),   // kVK_ANSI_KeypadDivide
+        HidKeyCode::NumLock => Some(0x47), // kVK_ANSI_KeypadClear (NumLock on Mac)
+        HidKeyCode::NumpadDivide => Some(0x4B), // kVK_ANSI_KeypadDivide
         HidKeyCode::NumpadMultiply => Some(0x43), // kVK_ANSI_KeypadMultiply
         HidKeyCode::NumpadSubtract => Some(0x4E), // kVK_ANSI_KeypadMinus
-        HidKeyCode::NumpadAdd => Some(0x45),      // kVK_ANSI_KeypadPlus
-        HidKeyCode::NumpadEnter => Some(0x4C),    // kVK_ANSI_KeypadEnter
-        HidKeyCode::Numpad0 => Some(0x52),        // kVK_ANSI_Keypad0
-        HidKeyCode::Numpad1 => Some(0x53),        // kVK_ANSI_Keypad1
-        HidKeyCode::Numpad2 => Some(0x54),        // kVK_ANSI_Keypad2
-        HidKeyCode::Numpad3 => Some(0x55),        // kVK_ANSI_Keypad3
-        HidKeyCode::Numpad4 => Some(0x56),        // kVK_ANSI_Keypad4
-        HidKeyCode::Numpad5 => Some(0x57),        // kVK_ANSI_Keypad5
-        HidKeyCode::Numpad6 => Some(0x58),        // kVK_ANSI_Keypad6
-        HidKeyCode::Numpad7 => Some(0x59),        // kVK_ANSI_Keypad7
-        HidKeyCode::Numpad8 => Some(0x5B),        // kVK_ANSI_Keypad8
-        HidKeyCode::Numpad9 => Some(0x5C),        // kVK_ANSI_Keypad9
-        HidKeyCode::NumpadDecimal => Some(0x41),  // kVK_ANSI_KeypadDecimal
+        HidKeyCode::NumpadAdd => Some(0x45), // kVK_ANSI_KeypadPlus
+        HidKeyCode::NumpadEnter => Some(0x4C), // kVK_ANSI_KeypadEnter
+        HidKeyCode::Numpad0 => Some(0x52), // kVK_ANSI_Keypad0
+        HidKeyCode::Numpad1 => Some(0x53), // kVK_ANSI_Keypad1
+        HidKeyCode::Numpad2 => Some(0x54), // kVK_ANSI_Keypad2
+        HidKeyCode::Numpad3 => Some(0x55), // kVK_ANSI_Keypad3
+        HidKeyCode::Numpad4 => Some(0x56), // kVK_ANSI_Keypad4
+        HidKeyCode::Numpad5 => Some(0x57), // kVK_ANSI_Keypad5
+        HidKeyCode::Numpad6 => Some(0x58), // kVK_ANSI_Keypad6
+        HidKeyCode::Numpad7 => Some(0x59), // kVK_ANSI_Keypad7
+        HidKeyCode::Numpad8 => Some(0x5B), // kVK_ANSI_Keypad8
+        HidKeyCode::Numpad9 => Some(0x5C), // kVK_ANSI_Keypad9
+        HidKeyCode::NumpadDecimal => Some(0x41), // kVK_ANSI_KeypadDecimal
 
         // Punctuation / symbols
         HidKeyCode::Minus => Some(0x1B),        // kVK_ANSI_Minus
@@ -165,13 +165,32 @@ mod tests {
     #[test]
     fn test_all_letter_keys_have_macos_mappings() {
         for letter in [
-            HidKeyCode::KeyA, HidKeyCode::KeyB, HidKeyCode::KeyC, HidKeyCode::KeyD,
-            HidKeyCode::KeyE, HidKeyCode::KeyF, HidKeyCode::KeyG, HidKeyCode::KeyH,
-            HidKeyCode::KeyI, HidKeyCode::KeyJ, HidKeyCode::KeyK, HidKeyCode::KeyL,
-            HidKeyCode::KeyM, HidKeyCode::KeyN, HidKeyCode::KeyO, HidKeyCode::KeyP,
-            HidKeyCode::KeyQ, HidKeyCode::KeyR, HidKeyCode::KeyS, HidKeyCode::KeyT,
-            HidKeyCode::KeyU, HidKeyCode::KeyV, HidKeyCode::KeyW, HidKeyCode::KeyX,
-            HidKeyCode::KeyY, HidKeyCode::KeyZ,
+            HidKeyCode::KeyA,
+            HidKeyCode::KeyB,
+            HidKeyCode::KeyC,
+            HidKeyCode::KeyD,
+            HidKeyCode::KeyE,
+            HidKeyCode::KeyF,
+            HidKeyCode::KeyG,
+            HidKeyCode::KeyH,
+            HidKeyCode::KeyI,
+            HidKeyCode::KeyJ,
+            HidKeyCode::KeyK,
+            HidKeyCode::KeyL,
+            HidKeyCode::KeyM,
+            HidKeyCode::KeyN,
+            HidKeyCode::KeyO,
+            HidKeyCode::KeyP,
+            HidKeyCode::KeyQ,
+            HidKeyCode::KeyR,
+            HidKeyCode::KeyS,
+            HidKeyCode::KeyT,
+            HidKeyCode::KeyU,
+            HidKeyCode::KeyV,
+            HidKeyCode::KeyW,
+            HidKeyCode::KeyX,
+            HidKeyCode::KeyY,
+            HidKeyCode::KeyZ,
         ] {
             assert!(
                 hid_to_cgkeycode(letter).is_some(),
@@ -183,35 +202,63 @@ mod tests {
     #[test]
     fn test_all_digit_keys_have_macos_mappings() {
         for digit in [
-            HidKeyCode::Digit0, HidKeyCode::Digit1, HidKeyCode::Digit2,
-            HidKeyCode::Digit3, HidKeyCode::Digit4, HidKeyCode::Digit5,
-            HidKeyCode::Digit6, HidKeyCode::Digit7, HidKeyCode::Digit8,
+            HidKeyCode::Digit0,
+            HidKeyCode::Digit1,
+            HidKeyCode::Digit2,
+            HidKeyCode::Digit3,
+            HidKeyCode::Digit4,
+            HidKeyCode::Digit5,
+            HidKeyCode::Digit6,
+            HidKeyCode::Digit7,
+            HidKeyCode::Digit8,
             HidKeyCode::Digit9,
         ] {
-            assert!(hid_to_cgkeycode(digit).is_some(), "{digit:?} should have a macOS CGKeyCode");
+            assert!(
+                hid_to_cgkeycode(digit).is_some(),
+                "{digit:?} should have a macOS CGKeyCode"
+            );
         }
     }
 
     #[test]
     fn test_all_function_keys_have_macos_mappings() {
         for fkey in [
-            HidKeyCode::F1, HidKeyCode::F2, HidKeyCode::F3, HidKeyCode::F4,
-            HidKeyCode::F5, HidKeyCode::F6, HidKeyCode::F7, HidKeyCode::F8,
-            HidKeyCode::F9, HidKeyCode::F10, HidKeyCode::F11, HidKeyCode::F12,
+            HidKeyCode::F1,
+            HidKeyCode::F2,
+            HidKeyCode::F3,
+            HidKeyCode::F4,
+            HidKeyCode::F5,
+            HidKeyCode::F6,
+            HidKeyCode::F7,
+            HidKeyCode::F8,
+            HidKeyCode::F9,
+            HidKeyCode::F10,
+            HidKeyCode::F11,
+            HidKeyCode::F12,
         ] {
-            assert!(hid_to_cgkeycode(fkey).is_some(), "{fkey:?} should have a macOS CGKeyCode");
+            assert!(
+                hid_to_cgkeycode(fkey).is_some(),
+                "{fkey:?} should have a macOS CGKeyCode"
+            );
         }
     }
 
     #[test]
     fn test_all_modifier_keys_have_macos_mappings() {
         for modifier in [
-            HidKeyCode::ControlLeft, HidKeyCode::ControlRight,
-            HidKeyCode::ShiftLeft, HidKeyCode::ShiftRight,
-            HidKeyCode::AltLeft, HidKeyCode::AltRight,
-            HidKeyCode::MetaLeft, HidKeyCode::MetaRight,
+            HidKeyCode::ControlLeft,
+            HidKeyCode::ControlRight,
+            HidKeyCode::ShiftLeft,
+            HidKeyCode::ShiftRight,
+            HidKeyCode::AltLeft,
+            HidKeyCode::AltRight,
+            HidKeyCode::MetaLeft,
+            HidKeyCode::MetaRight,
         ] {
-            assert!(hid_to_cgkeycode(modifier).is_some(), "{modifier:?} should have a macOS CGKeyCode");
+            assert!(
+                hid_to_cgkeycode(modifier).is_some(),
+                "{modifier:?} should have a macOS CGKeyCode"
+            );
         }
     }
 
@@ -255,7 +302,10 @@ mod tests {
             HidKeyCode::Delete,
             HidKeyCode::NumLock,
         ] {
-            assert!(hid_to_cgkeycode(key).is_some(), "{key:?} should have a macOS CGKeyCode");
+            assert!(
+                hid_to_cgkeycode(key).is_some(),
+                "{key:?} should have a macOS CGKeyCode"
+            );
         }
     }
 }

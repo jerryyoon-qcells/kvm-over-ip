@@ -362,7 +362,11 @@ mod tests {
 
         // Assert: correct variant and field values
         match msg {
-            BrowserToMasterMsg::Hello { client_name, capabilities, .. } => {
+            BrowserToMasterMsg::Hello {
+                client_name,
+                capabilities,
+                ..
+            } => {
                 assert_eq!(client_name, "my-browser");
                 assert_eq!(capabilities, 3);
             }
@@ -419,7 +423,9 @@ mod tests {
 
     #[test]
     fn test_browser_pong_round_trips() {
-        let original = BrowserToMasterMsg::Pong { token: 0xDEAD_BEEF_CAFE_1234 };
+        let original = BrowserToMasterMsg::Pong {
+            token: 0xDEAD_BEEF_CAFE_1234,
+        };
         let json = serde_json::to_string(&original).unwrap();
         let decoded: BrowserToMasterMsg = serde_json::from_str(&json).unwrap();
         assert_eq!(original, decoded);
@@ -674,7 +680,10 @@ mod tests {
         let result: Result<BrowserToMasterMsg, _> = serde_json::from_str(json);
 
         // Assert: serde must return an error for unknown variants
-        assert!(result.is_err(), "Unknown type must produce a deserialization error");
+        assert!(
+            result.is_err(),
+            "Unknown type must produce a deserialization error"
+        );
     }
 
     #[test]
@@ -686,6 +695,9 @@ mod tests {
         let result: Result<BrowserToMasterMsg, _> = serde_json::from_str(json);
 
         // Assert
-        assert!(result.is_err(), "Missing 'type' field must produce a deserialization error");
+        assert!(
+            result.is_err(),
+            "Missing 'type' field must produce a deserialization error"
+        );
     }
 }

@@ -23,8 +23,8 @@
 use thiserror::Error;
 
 use kvm_core::protocol::messages::{
-    ClipboardDataMessage, ClipboardFormat, DisconnectReason, HelloMessage, InputEvent,
-    KvmMessage, MonitorInfo, PairingResponseMessage, PlatformId, ScreenInfoMessage,
+    ClipboardDataMessage, ClipboardFormat, DisconnectReason, HelloMessage, InputEvent, KvmMessage,
+    MonitorInfo, PairingResponseMessage, PlatformId, ScreenInfoMessage,
 };
 
 use crate::domain::messages::{BrowserToMasterMsg, InputEventJson, MasterToBrowserMsg};
@@ -266,9 +266,10 @@ pub fn translate_kvm_to_browser(kvm_msg: &KvmMessage) -> Option<MasterToBrowserM
             // Translate each batch event to its JSON representation.
             // The batch structure is preserved so the browser can process
             // high-frequency events efficiently.
-            let json_events: Vec<InputEventJson> =
-                events.iter().map(input_event_to_json).collect();
-            Some(MasterToBrowserMsg::InputBatch { events: json_events })
+            let json_events: Vec<InputEventJson> = events.iter().map(input_event_to_json).collect();
+            Some(MasterToBrowserMsg::InputBatch {
+                events: json_events,
+            })
         }
 
         // Messages that are NOT forwarded to the browser:
@@ -385,8 +386,16 @@ pub fn base64_encode(data: &[u8]) -> String {
         result.push(ALPHABET[i0] as char);
         result.push(ALPHABET[i1] as char);
         // Add padding '=' for incomplete trailing chunks.
-        result.push(if chunk.len() > 1 { ALPHABET[i2] as char } else { '=' });
-        result.push(if chunk.len() > 2 { ALPHABET[i3] as char } else { '=' });
+        result.push(if chunk.len() > 1 {
+            ALPHABET[i2] as char
+        } else {
+            '='
+        });
+        result.push(if chunk.len() > 2 {
+            ALPHABET[i3] as char
+        } else {
+            '='
+        });
     }
 
     result
@@ -398,14 +407,14 @@ pub fn base64_encode(data: &[u8]) -> String {
 mod tests {
     use super::*;
     use kvm_core::keymap::hid::HidKeyCode;
+    use kvm_core::protocol::messages::capabilities;
     use kvm_core::protocol::messages::{
         ButtonEventType, ClipboardDataMessage, ClipboardFormat, ConfigUpdateMessage,
-        DisconnectReason, ErrorMessage, HelloAckMessage, InputEvent, KeyEventMessage,
-        KeyEventType, ModifierFlags, MouseButton, MouseButtonMessage, MouseMoveMessage,
-        MouseScrollMessage, PairingRequestMessage, ProtocolErrorCode,
+        DisconnectReason, ErrorMessage, HelloAckMessage, InputEvent, KeyEventMessage, KeyEventType,
+        ModifierFlags, MouseButton, MouseButtonMessage, MouseMoveMessage, MouseScrollMessage,
+        PairingRequestMessage, ProtocolErrorCode,
     };
     use uuid::Uuid;
-    use kvm_core::protocol::messages::capabilities;
 
     // ── translate_browser_to_kvm tests ────────────────────────────────────────
 
@@ -470,7 +479,11 @@ mod tests {
         // Assert: a browser always produces exactly one primary monitor
         match result {
             KvmMessage::ScreenInfo(s) => {
-                assert_eq!(s.monitors.len(), 1, "browser always has exactly one monitor");
+                assert_eq!(
+                    s.monitors.len(),
+                    1,
+                    "browser always has exactly one monitor"
+                );
                 let m = &s.monitors[0];
                 assert_eq!(m.width, 1920);
                 assert_eq!(m.height, 1080);
@@ -635,7 +648,11 @@ mod tests {
         });
         let result = translate_kvm_to_browser(&kvm).unwrap();
         match result {
-            MasterToBrowserMsg::HelloAck { accepted, reject_reason, .. } => {
+            MasterToBrowserMsg::HelloAck {
+                accepted,
+                reject_reason,
+                ..
+            } => {
                 assert!(!accepted);
                 assert_eq!(reject_reason, 0x03);
             }
@@ -685,7 +702,12 @@ mod tests {
         });
         let result = translate_kvm_to_browser(&kvm).unwrap();
         match result {
-            MasterToBrowserMsg::KeyEvent { key_code, event_type, modifiers, .. } => {
+            MasterToBrowserMsg::KeyEvent {
+                key_code,
+                event_type,
+                modifiers,
+                ..
+            } => {
                 assert_eq!(key_code, HidKeyCode::KeyA as u16);
                 assert_eq!(event_type, "down");
                 assert_eq!(modifiers, ModifierFlags::LEFT_CTRL);
@@ -721,7 +743,12 @@ mod tests {
         });
         let result = translate_kvm_to_browser(&kvm).unwrap();
         match result {
-            MasterToBrowserMsg::MouseMove { x, y, delta_x, delta_y } => {
+            MasterToBrowserMsg::MouseMove {
+                x,
+                y,
+                delta_x,
+                delta_y,
+            } => {
                 assert_eq!(x, 1920);
                 assert_eq!(y, 1080);
                 assert_eq!(delta_x, -3);
@@ -741,7 +768,12 @@ mod tests {
         });
         let result = translate_kvm_to_browser(&kvm).unwrap();
         match result {
-            MasterToBrowserMsg::MouseButton { button, event_type, x, y } => {
+            MasterToBrowserMsg::MouseButton {
+                button,
+                event_type,
+                x,
+                y,
+            } => {
                 assert_eq!(button, MouseButton::Left as u8);
                 assert_eq!(event_type, "press");
                 assert_eq!(x, 100);
@@ -778,7 +810,12 @@ mod tests {
         });
         let result = translate_kvm_to_browser(&kvm).unwrap();
         match result {
-            MasterToBrowserMsg::MouseScroll { delta_x, delta_y, x, y } => {
+            MasterToBrowserMsg::MouseScroll {
+                delta_x,
+                delta_y,
+                x,
+                y,
+            } => {
                 assert_eq!(delta_x, 0);
                 assert_eq!(delta_y, 120);
                 assert_eq!(x, 500);
@@ -802,7 +839,11 @@ mod tests {
 
         // Assert
         match result {
-            MasterToBrowserMsg::ClipboardData { format, data_base64, has_more_fragments } => {
+            MasterToBrowserMsg::ClipboardData {
+                format,
+                data_base64,
+                has_more_fragments,
+            } => {
                 assert_eq!(format, "text");
                 assert_eq!(data_base64, "SGVsbG8=");
                 assert!(!has_more_fragments);
@@ -834,7 +875,11 @@ mod tests {
         });
         let result = translate_kvm_to_browser(&kvm).unwrap();
         match result {
-            MasterToBrowserMsg::ClipboardData { format, has_more_fragments, .. } => {
+            MasterToBrowserMsg::ClipboardData {
+                format,
+                has_more_fragments,
+                ..
+            } => {
                 assert_eq!(format, "image");
                 assert!(has_more_fragments);
             }
@@ -844,7 +889,9 @@ mod tests {
 
     #[test]
     fn test_kvm_disconnect_user_initiated_produces_user_string() {
-        let kvm = KvmMessage::Disconnect { reason: DisconnectReason::UserInitiated };
+        let kvm = KvmMessage::Disconnect {
+            reason: DisconnectReason::UserInitiated,
+        };
         let result = translate_kvm_to_browser(&kvm).unwrap();
         match result {
             MasterToBrowserMsg::Disconnect { reason } => assert_eq!(reason, "user"),
@@ -854,7 +901,9 @@ mod tests {
 
     #[test]
     fn test_kvm_disconnect_server_shutdown_produces_shutdown_string() {
-        let kvm = KvmMessage::Disconnect { reason: DisconnectReason::ServerShutdown };
+        let kvm = KvmMessage::Disconnect {
+            reason: DisconnectReason::ServerShutdown,
+        };
         let result = translate_kvm_to_browser(&kvm).unwrap();
         match result {
             MasterToBrowserMsg::Disconnect { reason } => assert_eq!(reason, "shutdown"),
@@ -864,7 +913,9 @@ mod tests {
 
     #[test]
     fn test_kvm_disconnect_timeout_produces_timeout_string() {
-        let kvm = KvmMessage::Disconnect { reason: DisconnectReason::Timeout };
+        let kvm = KvmMessage::Disconnect {
+            reason: DisconnectReason::Timeout,
+        };
         let result = translate_kvm_to_browser(&kvm).unwrap();
         match result {
             MasterToBrowserMsg::Disconnect { reason } => assert_eq!(reason, "timeout"),
@@ -881,7 +932,11 @@ mod tests {
         });
         let result = translate_kvm_to_browser(&kvm).unwrap();
         match result {
-            MasterToBrowserMsg::ConfigUpdate { log_level, disable_hotkey, flags } => {
+            MasterToBrowserMsg::ConfigUpdate {
+                log_level,
+                disable_hotkey,
+                flags,
+            } => {
                 assert_eq!(log_level, "debug");
                 assert_eq!(disable_hotkey, "ScrollLock+ScrollLock");
                 assert_eq!(flags, 1);
@@ -908,7 +963,10 @@ mod tests {
         });
         let result = translate_kvm_to_browser(&kvm).unwrap();
         match result {
-            MasterToBrowserMsg::Error { error_code, description } => {
+            MasterToBrowserMsg::Error {
+                error_code,
+                description,
+            } => {
                 assert_eq!(error_code, ProtocolErrorCode::PairingRequired as u8);
                 assert_eq!(description, "pairing required");
             }
@@ -1115,7 +1173,11 @@ mod tests {
         // Assert: fields survive the full trip
         assert_eq!(json_msg, decoded);
         match decoded {
-            MasterToBrowserMsg::KeyEvent { event_type, modifiers, .. } => {
+            MasterToBrowserMsg::KeyEvent {
+                event_type,
+                modifiers,
+                ..
+            } => {
                 assert_eq!(event_type, "down");
                 assert_eq!(modifiers, ModifierFlags::LEFT_ALT);
             }

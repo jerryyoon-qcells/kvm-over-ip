@@ -28,8 +28,8 @@
 use kvm_core::{
     keymap::hid::HidKeyCode,
     protocol::messages::{
-        ButtonEventType, KeyEventMessage, KeyEventType, MouseButton, MouseButtonMessage,
-        ModifierFlags, MouseMoveMessage, MouseScrollMessage,
+        ButtonEventType, KeyEventMessage, KeyEventType, ModifierFlags, MouseButton,
+        MouseButtonMessage, MouseMoveMessage, MouseScrollMessage,
     },
 };
 use thiserror::Error;
@@ -57,11 +57,7 @@ pub trait PlatformInputEmulator: Send + Sync {
     ) -> Result<(), EmulationError>;
 
     /// Emulates a key release (key-up event).
-    fn emit_key_up(
-        &self,
-        key: HidKeyCode,
-        modifiers: ModifierFlags,
-    ) -> Result<(), EmulationError>;
+    fn emit_key_up(&self, key: HidKeyCode, modifiers: ModifierFlags) -> Result<(), EmulationError>;
 
     /// Moves the cursor to an absolute position in the client's coordinate space.
     fn emit_mouse_move(&self, x: i32, y: i32) -> Result<(), EmulationError>;
@@ -159,7 +155,8 @@ impl EmulateInputUseCase {
     ///
     /// Returns [`EmulationError`] if the OS event injection fails.
     pub fn handle_mouse_scroll(&self, event: &MouseScrollMessage) -> Result<(), EmulationError> {
-        self.emulator.emit_mouse_scroll(event.delta_x, event.delta_y)
+        self.emulator
+            .emit_mouse_scroll(event.delta_x, event.delta_y)
     }
 
     /// Resets internal state (e.g., on reconnect).
@@ -173,7 +170,7 @@ impl EmulateInputUseCase {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kvm_core::protocol::messages::{MouseButton, ButtonEventType};
+    use kvm_core::protocol::messages::{ButtonEventType, MouseButton};
     use std::sync::{Arc, Mutex};
 
     // ── Mock emulator ─────────────────────────────────────────────────────────
@@ -288,7 +285,12 @@ mod tests {
     fn test_handle_mouse_move_sends_position_to_emulator() {
         // Arrange
         let (mut uc, em) = make_use_case();
-        let event = MouseMoveMessage { x: 640, y: 480, delta_x: 0, delta_y: 0 };
+        let event = MouseMoveMessage {
+            x: 640,
+            y: 480,
+            delta_x: 0,
+            delta_y: 0,
+        };
 
         // Act
         uc.handle_mouse_move(&event).unwrap();
@@ -301,7 +303,12 @@ mod tests {
     fn test_handle_mouse_move_deduplicates_identical_consecutive_positions() {
         // Arrange
         let (mut uc, em) = make_use_case();
-        let event = MouseMoveMessage { x: 100, y: 200, delta_x: 0, delta_y: 0 };
+        let event = MouseMoveMessage {
+            x: 100,
+            y: 200,
+            delta_x: 0,
+            delta_y: 0,
+        };
 
         // Act – send same position twice
         uc.handle_mouse_move(&event).unwrap();
@@ -317,8 +324,20 @@ mod tests {
         let (mut uc, em) = make_use_case();
 
         // Act
-        uc.handle_mouse_move(&MouseMoveMessage { x: 100, y: 200, delta_x: 0, delta_y: 0 }).unwrap();
-        uc.handle_mouse_move(&MouseMoveMessage { x: 101, y: 200, delta_x: 1, delta_y: 0 }).unwrap();
+        uc.handle_mouse_move(&MouseMoveMessage {
+            x: 100,
+            y: 200,
+            delta_x: 0,
+            delta_y: 0,
+        })
+        .unwrap();
+        uc.handle_mouse_move(&MouseMoveMessage {
+            x: 101,
+            y: 200,
+            delta_x: 1,
+            delta_y: 0,
+        })
+        .unwrap();
 
         // Assert – both positions sent
         assert_eq!(em.mouse_moves.lock().unwrap().len(), 2);
@@ -328,7 +347,12 @@ mod tests {
     fn test_reset_clears_dedup_state() {
         // Arrange
         let (mut uc, em) = make_use_case();
-        let event = MouseMoveMessage { x: 100, y: 200, delta_x: 0, delta_y: 0 };
+        let event = MouseMoveMessage {
+            x: 100,
+            y: 200,
+            delta_x: 0,
+            delta_y: 0,
+        };
         uc.handle_mouse_move(&event).unwrap(); // first send
 
         // Act
@@ -386,7 +410,12 @@ mod tests {
     fn test_handle_mouse_scroll_vertical() {
         // Arrange
         let (uc, em) = make_use_case();
-        let event = MouseScrollMessage { delta_x: 0, delta_y: 120, x: 0, y: 0 };
+        let event = MouseScrollMessage {
+            delta_x: 0,
+            delta_y: 120,
+            x: 0,
+            y: 0,
+        };
 
         // Act
         uc.handle_mouse_scroll(&event).unwrap();
@@ -399,7 +428,12 @@ mod tests {
     fn test_handle_mouse_scroll_horizontal() {
         // Arrange
         let (uc, em) = make_use_case();
-        let event = MouseScrollMessage { delta_x: -120, delta_y: 0, x: 0, y: 0 };
+        let event = MouseScrollMessage {
+            delta_x: -120,
+            delta_y: 0,
+            x: 0,
+            y: 0,
+        };
 
         // Act
         uc.handle_mouse_scroll(&event).unwrap();

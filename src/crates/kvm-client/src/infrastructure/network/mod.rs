@@ -47,9 +47,7 @@ use std::time::Duration;
 
 use kvm_core::{
     decode_message, encode_message,
-    protocol::messages::{
-        capabilities, HelloMessage, KvmMessage, PlatformId, ScreenInfoMessage,
-    },
+    protocol::messages::{capabilities, HelloMessage, KvmMessage, PlatformId, ScreenInfoMessage},
 };
 use thiserror::Error;
 use tokio::{
@@ -195,10 +193,16 @@ impl ClientConnection {
                             *guard = None;
                         }
                         let _ = tx.send(NetworkEvent::Disconnected).await;
-                        info!("disconnected from master; reconnecting in {:?}", this.config.reconnect_interval);
+                        info!(
+                            "disconnected from master; reconnecting in {:?}",
+                            this.config.reconnect_interval
+                        );
                     }
                     Err(e) => {
-                        warn!("could not connect to master at {}: {e}", this.config.master_addr);
+                        warn!(
+                            "could not connect to master at {}: {e}",
+                            this.config.master_addr
+                        );
                     }
                 }
 
@@ -246,16 +250,12 @@ impl ClientConnection {
             }
 
             // Payload length is at bytes 4..8 (big-endian u32)
-            let payload_len =
-                u32::from_be_bytes(header_buf[4..8].try_into().unwrap()) as usize;
+            let payload_len = u32::from_be_bytes(header_buf[4..8].try_into().unwrap()) as usize;
 
             let mut full_msg = header_buf;
             full_msg.extend(vec![0u8; payload_len]);
             if payload_len > 0 {
-                if let Err(e) = reader
-                    .read_exact(&mut full_msg[HEADER_SIZE..])
-                    .await
-                {
+                if let Err(e) = reader.read_exact(&mut full_msg[HEADER_SIZE..]).await {
                     error!("read payload error: {e}");
                     break;
                 }
@@ -270,7 +270,11 @@ impl ClientConnection {
                         let pong = KvmMessage::Pong(seq);
                         self.send_message(&pong).await;
                         // Forward the Ping to the application layer so it can track latency.
-                        if tx.send(NetworkEvent::MessageReceived(KvmMessage::Ping(seq))).await.is_err() {
+                        if tx
+                            .send(NetworkEvent::MessageReceived(KvmMessage::Ping(seq)))
+                            .await
+                            .is_err()
+                        {
                             break;
                         }
                     } else if tx.send(NetworkEvent::MessageReceived(msg)).await.is_err() {
@@ -304,7 +308,8 @@ impl ClientConnection {
     ///
     /// The `ScreenInfoMessage` is built by the `screen_info` infrastructure module.
     pub async fn send_screen_info(&self, screen_info: ScreenInfoMessage) {
-        self.send_message(&KvmMessage::ScreenInfo(screen_info)).await;
+        self.send_message(&KvmMessage::ScreenInfo(screen_info))
+            .await;
     }
 
     /// Sends a `Ping` to measure round-trip latency.

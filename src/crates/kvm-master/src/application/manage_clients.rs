@@ -23,10 +23,8 @@
 //! - `Connected`: the TCP channel is open and input events are flowing.
 //! - `Disconnected`: the TCP channel closed; the entry is kept for reconnection.
 
-use std::collections::HashMap;
 use kvm_core::ClientId;
-use uuid::Uuid;
-use crate::infrastructure::network::connection_manager::ConnectedClientInfo;
+use std::collections::HashMap;
 
 /// Current state of a client connection.
 ///
@@ -172,7 +170,10 @@ mod tests {
         let id = client.id;
         registry.upsert(client);
         registry.set_state(id, ConnectionState::Connected);
-        assert_eq!(registry.get(id).unwrap().connection_state, ConnectionState::Connected);
+        assert_eq!(
+            registry.get(id).unwrap().connection_state,
+            ConnectionState::Connected
+        );
     }
 
     #[test]

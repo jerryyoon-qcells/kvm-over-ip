@@ -53,7 +53,6 @@ use kvm_core::{
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
-use uuid::Uuid;
 
 /// Error type for discovery service operations.
 #[derive(Debug, Error)]
@@ -101,10 +100,8 @@ pub fn start_discovery_responder(
     running: Arc<AtomicBool>,
 ) -> Result<mpsc::Receiver<DiscoveryEvent>, DiscoveryError> {
     let addr: SocketAddr = format!("0.0.0.0:{discovery_port}").parse().unwrap();
-    let socket = UdpSocket::bind(addr).map_err(|source| DiscoveryError::BindFailed {
-        addr,
-        source,
-    })?;
+    let socket =
+        UdpSocket::bind(addr).map_err(|source| DiscoveryError::BindFailed { addr, source })?;
     socket
         .set_read_timeout(Some(Duration::from_millis(500)))
         .ok();
@@ -123,11 +120,7 @@ pub fn start_discovery_responder(
 }
 
 /// The main receive loop executed on the discovery thread.
-fn discovery_loop(
-    socket: UdpSocket,
-    tx: mpsc::Sender<DiscoveryEvent>,
-    running: Arc<AtomicBool>,
-) {
+fn discovery_loop(socket: UdpSocket, tx: mpsc::Sender<DiscoveryEvent>, running: Arc<AtomicBool>) {
     let mut buf = vec![0u8; 4096];
 
     while running.load(Ordering::Relaxed) {
@@ -166,7 +159,10 @@ fn discovery_loop(
                 }
             }
             Ok((other, _)) => {
-                warn!("unexpected message on discovery port from {src}: {:?}", std::mem::discriminant(&other));
+                warn!(
+                    "unexpected message on discovery port from {src}: {:?}",
+                    std::mem::discriminant(&other)
+                );
             }
             Err(e) => {
                 debug!("failed to decode discovery datagram from {src}: {e}");

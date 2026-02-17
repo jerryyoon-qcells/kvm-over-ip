@@ -93,8 +93,8 @@ impl PlatformInputEmulator for MacosInputEmulator {
         _modifiers: ModifierFlags,
     ) -> Result<(), EmulationError> {
         // Translate the USB HID Usage ID to the macOS CGKeyCode.
-        let cgkeycode = KeyMapper::hid_to_macos_cgkeycode(key)
-            .ok_or(EmulationError::InvalidKeyCode(key))?;
+        let cgkeycode =
+            KeyMapper::hid_to_macos_cgkeycode(key).ok_or(EmulationError::InvalidKeyCode(key))?;
         // Production sequence:
         //   let src = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
         //   let event = CGEventCreateKeyboardEvent(src, cgkeycode, true);  // true = key down
@@ -110,8 +110,8 @@ impl PlatformInputEmulator for MacosInputEmulator {
         key: HidKeyCode,
         _modifiers: ModifierFlags,
     ) -> Result<(), EmulationError> {
-        let cgkeycode = KeyMapper::hid_to_macos_cgkeycode(key)
-            .ok_or(EmulationError::InvalidKeyCode(key))?;
+        let cgkeycode =
+            KeyMapper::hid_to_macos_cgkeycode(key).ok_or(EmulationError::InvalidKeyCode(key))?;
         // Production: same as emit_key_down but with `false` (key up) as the third argument
         // to CGEventCreateKeyboardEvent.
         let _ = cgkeycode;

@@ -29,7 +29,7 @@
 //! configuration.  Only when a difference is detected does the client send a
 //! new report, avoiding unnecessary network traffic.
 
-use kvm_core::protocol::messages::{MonitorInfo, ScreenInfoMessage};
+use kvm_core::protocol::messages::ScreenInfoMessage;
 use thiserror::Error;
 
 /// Error type for screen enumeration.

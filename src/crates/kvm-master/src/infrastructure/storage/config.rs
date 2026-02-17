@@ -65,7 +65,7 @@ pub enum ConfigError {
 // ── Config schema types ───────────────────────────────────────────────────────
 
 /// Top-level application configuration stored on disk.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AppConfig {
     pub master: MasterConfig,
     pub network: NetworkConfig,
@@ -187,16 +187,7 @@ fn default_screen_height() -> u32 {
     1080
 }
 
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            master: MasterConfig::default(),
-            network: NetworkConfig::default(),
-            layout: LayoutConfig::default(),
-            clients: Vec::new(),
-        }
-    }
-}
+// AppConfig derives Default because all its fields implement Default.
 
 impl Default for MasterConfig {
     fn default() -> Self {
@@ -304,8 +295,7 @@ fn platform_config_dir() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         // %APPDATA% e.g. C:\Users\<user>\AppData\Roaming
-        std::env::var_os("APPDATA")
-            .map(|p| PathBuf::from(p).join("KVMOverIP"))
+        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("KVMOverIP"))
     }
 
     #[cfg(target_os = "linux")]
@@ -320,8 +310,12 @@ fn platform_config_dir() -> Option<PathBuf> {
     #[cfg(target_os = "macos")]
     {
         // ~/Library/Application Support/KVMOverIP
-        std::env::var_os("HOME")
-            .map(|h| PathBuf::from(h).join("Library").join("Application Support").join("KVMOverIP"))
+        std::env::var_os("HOME").map(|h| {
+            PathBuf::from(h)
+                .join("Library")
+                .join("Application Support")
+                .join("KVMOverIP")
+        })
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]

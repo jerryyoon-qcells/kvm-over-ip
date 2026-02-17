@@ -19,4 +19,6 @@ pub mod bridge_service;
 
 // Re-export so callers can write `application::bridge_service::translate_browser_to_kvm`
 // or more concisely `application::translate_browser_to_kvm`.
-pub use bridge_service::{base64_encode, translate_browser_to_kvm, translate_kvm_to_browser, BridgeError};
+pub use bridge_service::{
+    base64_encode, translate_browser_to_kvm, translate_kvm_to_browser, BridgeError,
+};

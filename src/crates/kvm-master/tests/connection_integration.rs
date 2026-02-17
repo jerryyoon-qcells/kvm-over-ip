@@ -119,7 +119,12 @@ fn test_pairing_wrong_pin_increments_failure_counter() {
     // First wrong attempt: 2 attempts remaining (3 total − 1 used = 2)
     let result = mgr.verify_pairing_pin(session_id, "bad_hash_1", addr);
     assert!(
-        matches!(result, Err(PairingError::WrongPin { attempts_remaining: 2 })),
+        matches!(
+            result,
+            Err(PairingError::WrongPin {
+                attempts_remaining: 2
+            })
+        ),
         "expected WrongPin with 2 remaining, got: {:?}",
         result
     );
@@ -272,7 +277,10 @@ fn test_network_config_default_values_are_sensible() {
     use kvm_master::infrastructure::network::connection_manager::NetworkConfig;
 
     let cfg = NetworkConfig::default();
-    assert_eq!(cfg.control_port, 24800, "default control port must be 24800");
+    assert_eq!(
+        cfg.control_port, 24800,
+        "default control port must be 24800"
+    );
     assert_eq!(cfg.input_port, 24801, "default input port must be 24801");
     assert_eq!(
         cfg.discovery_port, 24802,

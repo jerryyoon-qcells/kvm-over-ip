@@ -52,8 +52,6 @@
 //! environment variable is not set or the X server is not accessible, the
 //! constructor fails with a `Platform` error.
 
-#![cfg(target_os = "linux")]
-
 use kvm_core::{
     keymap::{hid::HidKeyCode, KeyMapper},
     protocol::messages::{ModifierFlags, MouseButton},
@@ -108,8 +106,8 @@ impl PlatformInputEmulator for LinuxXTestEmulator {
         _modifiers: ModifierFlags,
     ) -> Result<(), EmulationError> {
         // Translate the USB HID Usage ID to the X11 KeySym for this key.
-        let keysym = KeyMapper::hid_to_x11_keysym(key)
-            .ok_or(EmulationError::InvalidKeyCode(key))?;
+        let keysym =
+            KeyMapper::hid_to_x11_keysym(key).ok_or(EmulationError::InvalidKeyCode(key))?;
         // Production: XTestFakeKeyEvent(display, XKeysymToKeycode(display, keysym), True, CURRENT_TIME)
         // followed by XFlush(display) to ensure the event is sent immediately.
         let _ = keysym;
@@ -121,8 +119,8 @@ impl PlatformInputEmulator for LinuxXTestEmulator {
         key: HidKeyCode,
         _modifiers: ModifierFlags,
     ) -> Result<(), EmulationError> {
-        let keysym = KeyMapper::hid_to_x11_keysym(key)
-            .ok_or(EmulationError::InvalidKeyCode(key))?;
+        let keysym =
+            KeyMapper::hid_to_x11_keysym(key).ok_or(EmulationError::InvalidKeyCode(key))?;
         // Production: XTestFakeKeyEvent(display, XKeysymToKeycode(display, keysym), False, CURRENT_TIME)
         // `False` (the third argument) means key-up.
         let _ = keysym;

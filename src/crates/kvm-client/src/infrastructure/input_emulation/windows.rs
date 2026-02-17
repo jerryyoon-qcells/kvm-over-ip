@@ -70,8 +70,7 @@ impl PlatformInputEmulator for WindowsInputEmulator {
         key: HidKeyCode,
         _modifiers: ModifierFlags,
     ) -> Result<(), EmulationError> {
-        let vk = KeyMapper::hid_to_windows_vk(key)
-            .ok_or(EmulationError::InvalidKeyCode(key))?;
+        let vk = KeyMapper::hid_to_windows_vk(key).ok_or(EmulationError::InvalidKeyCode(key))?;
         send_key(vk, false)?;
         Ok(())
     }
@@ -81,8 +80,7 @@ impl PlatformInputEmulator for WindowsInputEmulator {
         key: HidKeyCode,
         _modifiers: ModifierFlags,
     ) -> Result<(), EmulationError> {
-        let vk = KeyMapper::hid_to_windows_vk(key)
-            .ok_or(EmulationError::InvalidKeyCode(key))?;
+        let vk = KeyMapper::hid_to_windows_vk(key).ok_or(EmulationError::InvalidKeyCode(key))?;
         send_key(vk, true)?;
         Ok(())
     }

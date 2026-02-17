@@ -74,7 +74,6 @@ impl PlatformScreenEnumerator for LinuxScreenEnumerator {
 /// opened or if `DISPLAY` is not set.
 #[cfg(target_os = "linux")]
 fn enumerate_via_xlib() -> Result<Vec<MonitorInfo>, ScreenInfoError> {
-    use std::ffi::CString;
     use x11::xlib;
 
     // SAFETY: XOpenDisplay is called with a null-terminated display string.

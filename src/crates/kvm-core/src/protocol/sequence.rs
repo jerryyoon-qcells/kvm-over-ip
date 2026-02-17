@@ -129,7 +129,10 @@ mod tests {
 
         // Assert – values must be strictly monotonically increasing
         for window in values.windows(2) {
-            assert!(window[1] > window[0], "values must be monotonically increasing");
+            assert!(
+                window[1] > window[0],
+                "values must be monotonically increasing"
+            );
         }
     }
 
@@ -195,7 +198,10 @@ mod tests {
 
         // Assert
         assert_eq!(current, 1, "current() should return 1 without advancing");
-        assert_eq!(next, 1, "next() should return 1 (the value before this increment)");
+        assert_eq!(
+            next, 1,
+            "next() should return 1 (the value before this increment)"
+        );
     }
 
     #[test]

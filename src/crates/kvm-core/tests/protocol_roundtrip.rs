@@ -377,10 +377,8 @@ fn test_sequence_counter_increments_across_encodes() {
     let msg = KvmMessage::Ping(0);
 
     // Encode twice with consecutive sequence numbers.
-    let bytes1 =
-        encode_message(&msg, counter.next(), 0).expect("encode 1");
-    let bytes2 =
-        encode_message(&msg, counter.next(), 0).expect("encode 2");
+    let bytes1 = encode_message(&msg, counter.next(), 0).expect("encode 1");
+    let bytes2 = encode_message(&msg, counter.next(), 0).expect("encode 2");
 
     // Decode both to make sure they are valid packets (not just raw bytes).
     let (_, _) = decode_message(&bytes1).expect("decode 1");

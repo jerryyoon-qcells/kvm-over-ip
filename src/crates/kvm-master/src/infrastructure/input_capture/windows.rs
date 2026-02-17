@@ -40,11 +40,35 @@ use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 // Those constants are for SendInput() output, not for WH_MOUSE_LL input matching.
 // See module-level docs above for a full explanation.
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
-    HC_ACTION, HHOOK, KBDLLHOOKSTRUCT, KBDLLHOOKSTRUCT_FLAGS, LLKHF_EXTENDED, MSG,
-    MSLLHOOKSTRUCT, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN,
-    WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSEMOVE, WM_MOUSEWHEEL,
-    WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP,
+    CallNextHookEx,
+    DispatchMessageW,
+    GetMessageW,
+    SetWindowsHookExW,
+    UnhookWindowsHookEx,
+    HC_ACTION,
+    HHOOK,
+    KBDLLHOOKSTRUCT,
+    KBDLLHOOKSTRUCT_FLAGS,
+    LLKHF_EXTENDED,
+    MSG,
+    MSLLHOOKSTRUCT,
+    WH_KEYBOARD_LL,
+    WH_MOUSE_LL,
+    WM_KEYDOWN,
+    WM_KEYUP,
+    WM_LBUTTONDOWN,
+    WM_LBUTTONUP,
+    WM_MBUTTONDOWN,
+    WM_MBUTTONUP,
+    WM_MOUSEHWHEEL,
+    WM_MOUSEMOVE,
+    WM_MOUSEWHEEL,
+    WM_RBUTTONDOWN,
+    WM_RBUTTONUP,
+    WM_SYSKEYDOWN,
+    WM_SYSKEYUP,
+    WM_XBUTTONDOWN,
+    WM_XBUTTONUP,
     // XBUTTON1 distinguishes the X1 side button from X2 in WM_XBUTTONDOWN/UP events.
     // XBUTTON2 is not used explicitly: any mouseData value that is not XBUTTON1 is
     // treated as X2 by the fallback branch in the match below.
@@ -101,11 +125,11 @@ impl InputSource for WindowsInputCaptureService {
         let (tx, rx) = mpsc::channel::<RawInputEvent>();
 
         // Register the global sender. This will fail if called a second time.
-        EVENT_SENDER
-            .set(tx)
-            .map_err(|_| CaptureError::KeyboardHookInstallFailed(
+        EVENT_SENDER.set(tx).map_err(|_| {
+            CaptureError::KeyboardHookInstallFailed(
                 "EVENT_SENDER already initialized – only one capture service may run".to_string(),
-            ))?;
+            )
+        })?;
 
         // Spawn the Win32 message loop thread that installs and manages the hooks.
         thread::Builder::new()
@@ -276,7 +300,12 @@ unsafe extern "system" fn mouse_hook_proc(
             } else {
                 MouseButton::X2
             };
-            RawInputEvent::MouseButtonDown { button, x, y, time_ms }
+            RawInputEvent::MouseButtonDown {
+                button,
+                x,
+                y,
+                time_ms,
+            }
         }
         WM_XBUTTONUP => {
             let button = if (mhs.mouseData >> 16) as u16 == XBUTTON1 {
@@ -284,7 +313,12 @@ unsafe extern "system" fn mouse_hook_proc(
             } else {
                 MouseButton::X2
             };
-            RawInputEvent::MouseButtonUp { button, x, y, time_ms }
+            RawInputEvent::MouseButtonUp {
+                button,
+                x,
+                y,
+                time_ms,
+            }
         }
 
         // FIX (Bug 1): The original code matched against MOUSEEVENTF_WHEEL.0 (= 0x0800)
@@ -301,12 +335,22 @@ unsafe extern "system" fn mouse_hook_proc(
         WM_MOUSEWHEEL => {
             // Vertical scroll: positive delta = away from user (up/zoom-in convention).
             let delta = (mhs.mouseData >> 16) as i16;
-            RawInputEvent::MouseWheel { delta, x, y, time_ms }
+            RawInputEvent::MouseWheel {
+                delta,
+                x,
+                y,
+                time_ms,
+            }
         }
         WM_MOUSEHWHEEL => {
             // Horizontal scroll (wheel tilt): positive delta = right.
             let delta = (mhs.mouseData >> 16) as i16;
-            RawInputEvent::MouseWheelH { delta, x, y, time_ms }
+            RawInputEvent::MouseWheelH {
+                delta,
+                x,
+                y,
+                time_ms,
+            }
         }
 
         _ => {

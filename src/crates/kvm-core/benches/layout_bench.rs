@@ -273,19 +273,15 @@ fn bench_check_edge_scaling(c: &mut Criterion) {
         let (layout, _) = build_layout_with_n_clients(count);
 
         // Check master right edge (first adjacency in list, best case for linear scan).
-        group.bench_with_input(
-            BenchmarkId::new("adjacencies", count),
-            &count,
-            |b, _| {
-                b.iter(|| {
-                    layout.check_edge_transition(
-                        black_box(&ScreenId::Master),
-                        black_box(1919),
-                        black_box(540),
-                    )
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("adjacencies", count), &count, |b, _| {
+            b.iter(|| {
+                layout.check_edge_transition(
+                    black_box(&ScreenId::Master),
+                    black_box(1919),
+                    black_box(540),
+                )
+            })
+        });
     }
 
     group.finish();

@@ -89,10 +89,7 @@ async fn main() -> anyhow::Result<()> {
         let state_clone = Arc::clone(&state);
         tokio::spawn(async move {
             while let Some(event) = rx.recv().await {
-                info!(
-                    "discovered client: {} ({})",
-                    event.name, event.client_id
-                );
+                info!("discovered client: {} ({})", event.name, event.client_id);
                 let mut registry = state_clone.client_registry.lock().await;
                 registry.upsert(ClientRuntimeState {
                     id: event.client_id,

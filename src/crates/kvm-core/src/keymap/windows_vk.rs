@@ -99,22 +99,22 @@ const VK_TO_HID_TABLE: [HidKeyCode; 256] = {
     t[0x39] = Digit9;
 
     // ── Control keys ─────────────────────────────────────────────────────────
-    t[0x0D] = Enter;        // VK_RETURN
-    t[0x1B] = Escape;       // VK_ESCAPE
-    t[0x08] = Backspace;    // VK_BACK
-    t[0x09] = Tab;          // VK_TAB
-    t[0x20] = Space;        // VK_SPACE
-    t[0x14] = CapsLock;     // VK_CAPITAL
-    t[0x91] = ScrollLock;   // VK_SCROLL
-    t[0x13] = Pause;        // VK_PAUSE
-    t[0x2D] = Insert;       // VK_INSERT
-    t[0x24] = Home;         // VK_HOME
-    t[0x21] = PageUp;       // VK_PRIOR
-    t[0x2E] = Delete;       // VK_DELETE
-    t[0x23] = End;          // VK_END
-    t[0x22] = PageDown;     // VK_NEXT
-    t[0x2C] = PrintScreen;  // VK_SNAPSHOT
-    t[0x5D] = ContextMenu;  // VK_APPS
+    t[0x0D] = Enter; // VK_RETURN
+    t[0x1B] = Escape; // VK_ESCAPE
+    t[0x08] = Backspace; // VK_BACK
+    t[0x09] = Tab; // VK_TAB
+    t[0x20] = Space; // VK_SPACE
+    t[0x14] = CapsLock; // VK_CAPITAL
+    t[0x91] = ScrollLock; // VK_SCROLL
+    t[0x13] = Pause; // VK_PAUSE
+    t[0x2D] = Insert; // VK_INSERT
+    t[0x24] = Home; // VK_HOME
+    t[0x21] = PageUp; // VK_PRIOR
+    t[0x2E] = Delete; // VK_DELETE
+    t[0x23] = End; // VK_END
+    t[0x22] = PageDown; // VK_NEXT
+    t[0x2C] = PrintScreen; // VK_SNAPSHOT
+    t[0x5D] = ContextMenu; // VK_APPS
 
     // ── Arrow keys ────────────────────────────────────────────────────────────
     t[0x25] = ArrowLeft;
@@ -147,35 +147,35 @@ const VK_TO_HID_TABLE: [HidKeyCode; 256] = {
     t[0x67] = Numpad7;
     t[0x68] = Numpad8;
     t[0x69] = Numpad9;
-    t[0x6A] = NumpadMultiply;   // VK_MULTIPLY
-    t[0x6B] = NumpadAdd;        // VK_ADD
-    t[0x6D] = NumpadSubtract;   // VK_SUBTRACT
-    t[0x6E] = NumpadDecimal;    // VK_DECIMAL
-    t[0x6F] = NumpadDivide;     // VK_DIVIDE
-    t[0x90] = NumLock;          // VK_NUMLOCK
+    t[0x6A] = NumpadMultiply; // VK_MULTIPLY
+    t[0x6B] = NumpadAdd; // VK_ADD
+    t[0x6D] = NumpadSubtract; // VK_SUBTRACT
+    t[0x6E] = NumpadDecimal; // VK_DECIMAL
+    t[0x6F] = NumpadDivide; // VK_DIVIDE
+    t[0x90] = NumLock; // VK_NUMLOCK
 
     // ── Punctuation / symbols ─────────────────────────────────────────────────
-    t[0xBD] = Minus;        // VK_OEM_MINUS  (- _)
-    t[0xBB] = Equal;        // VK_OEM_PLUS   (= +)
-    t[0xDB] = BracketLeft;  // VK_OEM_4      ([ {)
+    t[0xBD] = Minus; // VK_OEM_MINUS  (- _)
+    t[0xBB] = Equal; // VK_OEM_PLUS   (= +)
+    t[0xDB] = BracketLeft; // VK_OEM_4      ([ {)
     t[0xDD] = BracketRight; // VK_OEM_6      (] })
-    t[0xDC] = Backslash;    // VK_OEM_5      (\ |)
-    t[0xBA] = Semicolon;    // VK_OEM_1      (; :)
-    t[0xDE] = Quote;        // VK_OEM_7      (' ")
-    t[0xC0] = Backquote;    // VK_OEM_3      (` ~)
-    t[0xBC] = Comma;        // VK_OEM_COMMA  (, <)
-    t[0xBE] = Period;       // VK_OEM_PERIOD (. >)
-    t[0xBF] = Slash;        // VK_OEM_2      (/ ?)
+    t[0xDC] = Backslash; // VK_OEM_5      (\ |)
+    t[0xBA] = Semicolon; // VK_OEM_1      (; :)
+    t[0xDE] = Quote; // VK_OEM_7      (' ")
+    t[0xC0] = Backquote; // VK_OEM_3      (` ~)
+    t[0xBC] = Comma; // VK_OEM_COMMA  (, <)
+    t[0xBE] = Period; // VK_OEM_PERIOD (. >)
+    t[0xBF] = Slash; // VK_OEM_2      (/ ?)
 
     // ── Modifier keys ─────────────────────────────────────────────────────────
-    t[0xA2] = ControlLeft;  // VK_LCONTROL
+    t[0xA2] = ControlLeft; // VK_LCONTROL
     t[0xA3] = ControlRight; // VK_RCONTROL
-    t[0xA0] = ShiftLeft;    // VK_LSHIFT
-    t[0xA1] = ShiftRight;   // VK_RSHIFT
-    t[0xA4] = AltLeft;      // VK_LMENU
-    t[0xA5] = AltRight;     // VK_RMENU
-    t[0x5B] = MetaLeft;     // VK_LWIN
-    t[0x5C] = MetaRight;    // VK_RWIN
+    t[0xA0] = ShiftLeft; // VK_LSHIFT
+    t[0xA1] = ShiftRight; // VK_RSHIFT
+    t[0xA4] = AltLeft; // VK_LMENU
+    t[0xA5] = AltRight; // VK_RMENU
+    t[0x5B] = MetaLeft; // VK_LWIN
+    t[0x5C] = MetaRight; // VK_RWIN
 
     // ── Numpad Enter (extended) ───────────────────────────────────────────────
     // Note: WH_KEYBOARD_LL delivers VK_RETURN with extended flag for numpad Enter.
@@ -193,40 +193,115 @@ mod tests {
     /// Pairs of (VK code, expected HID code) for all standard US QWERTY keys.
     const STANDARD_MAPPINGS: &[(u8, HidKeyCode)] = &[
         // Letters
-        (0x41, KeyA), (0x42, KeyB), (0x43, KeyC), (0x44, KeyD), (0x45, KeyE),
-        (0x46, KeyF), (0x47, KeyG), (0x48, KeyH), (0x49, KeyI), (0x4A, KeyJ),
-        (0x4B, KeyK), (0x4C, KeyL), (0x4D, KeyM), (0x4E, KeyN), (0x4F, KeyO),
-        (0x50, KeyP), (0x51, KeyQ), (0x52, KeyR), (0x53, KeyS), (0x54, KeyT),
-        (0x55, KeyU), (0x56, KeyV), (0x57, KeyW), (0x58, KeyX), (0x59, KeyY),
+        (0x41, KeyA),
+        (0x42, KeyB),
+        (0x43, KeyC),
+        (0x44, KeyD),
+        (0x45, KeyE),
+        (0x46, KeyF),
+        (0x47, KeyG),
+        (0x48, KeyH),
+        (0x49, KeyI),
+        (0x4A, KeyJ),
+        (0x4B, KeyK),
+        (0x4C, KeyL),
+        (0x4D, KeyM),
+        (0x4E, KeyN),
+        (0x4F, KeyO),
+        (0x50, KeyP),
+        (0x51, KeyQ),
+        (0x52, KeyR),
+        (0x53, KeyS),
+        (0x54, KeyT),
+        (0x55, KeyU),
+        (0x56, KeyV),
+        (0x57, KeyW),
+        (0x58, KeyX),
+        (0x59, KeyY),
         (0x5A, KeyZ),
         // Digits
-        (0x30, Digit0), (0x31, Digit1), (0x32, Digit2), (0x33, Digit3), (0x34, Digit4),
-        (0x35, Digit5), (0x36, Digit6), (0x37, Digit7), (0x38, Digit8), (0x39, Digit9),
+        (0x30, Digit0),
+        (0x31, Digit1),
+        (0x32, Digit2),
+        (0x33, Digit3),
+        (0x34, Digit4),
+        (0x35, Digit5),
+        (0x36, Digit6),
+        (0x37, Digit7),
+        (0x38, Digit8),
+        (0x39, Digit9),
         // Function keys
-        (0x70, F1), (0x71, F2), (0x72, F3), (0x73, F4), (0x74, F5), (0x75, F6),
-        (0x76, F7), (0x77, F8), (0x78, F9), (0x79, F10), (0x7A, F11), (0x7B, F12),
+        (0x70, F1),
+        (0x71, F2),
+        (0x72, F3),
+        (0x73, F4),
+        (0x74, F5),
+        (0x75, F6),
+        (0x76, F7),
+        (0x77, F8),
+        (0x78, F9),
+        (0x79, F10),
+        (0x7A, F11),
+        (0x7B, F12),
         // Navigation
-        (0x25, ArrowLeft), (0x26, ArrowUp), (0x27, ArrowRight), (0x28, ArrowDown),
-        (0x24, Home), (0x23, End), (0x21, PageUp), (0x22, PageDown),
-        (0x2D, Insert), (0x2E, Delete),
+        (0x25, ArrowLeft),
+        (0x26, ArrowUp),
+        (0x27, ArrowRight),
+        (0x28, ArrowDown),
+        (0x24, Home),
+        (0x23, End),
+        (0x21, PageUp),
+        (0x22, PageDown),
+        (0x2D, Insert),
+        (0x2E, Delete),
         // Control keys
-        (0x0D, Enter), (0x1B, Escape), (0x08, Backspace), (0x09, Tab), (0x20, Space),
-        (0x14, CapsLock), (0x91, ScrollLock), (0x13, Pause), (0x2C, PrintScreen),
+        (0x0D, Enter),
+        (0x1B, Escape),
+        (0x08, Backspace),
+        (0x09, Tab),
+        (0x20, Space),
+        (0x14, CapsLock),
+        (0x91, ScrollLock),
+        (0x13, Pause),
+        (0x2C, PrintScreen),
         // Numpad
-        (0x60, Numpad0), (0x61, Numpad1), (0x62, Numpad2), (0x63, Numpad3),
-        (0x64, Numpad4), (0x65, Numpad5), (0x66, Numpad6), (0x67, Numpad7),
-        (0x68, Numpad8), (0x69, Numpad9),
-        (0x6A, NumpadMultiply), (0x6B, NumpadAdd), (0x6D, NumpadSubtract),
-        (0x6E, NumpadDecimal), (0x6F, NumpadDivide), (0x90, NumLock),
+        (0x60, Numpad0),
+        (0x61, Numpad1),
+        (0x62, Numpad2),
+        (0x63, Numpad3),
+        (0x64, Numpad4),
+        (0x65, Numpad5),
+        (0x66, Numpad6),
+        (0x67, Numpad7),
+        (0x68, Numpad8),
+        (0x69, Numpad9),
+        (0x6A, NumpadMultiply),
+        (0x6B, NumpadAdd),
+        (0x6D, NumpadSubtract),
+        (0x6E, NumpadDecimal),
+        (0x6F, NumpadDivide),
+        (0x90, NumLock),
         // Modifiers
-        (0xA2, ControlLeft), (0xA3, ControlRight),
-        (0xA0, ShiftLeft), (0xA1, ShiftRight),
-        (0xA4, AltLeft), (0xA5, AltRight),
-        (0x5B, MetaLeft), (0x5C, MetaRight),
+        (0xA2, ControlLeft),
+        (0xA3, ControlRight),
+        (0xA0, ShiftLeft),
+        (0xA1, ShiftRight),
+        (0xA4, AltLeft),
+        (0xA5, AltRight),
+        (0x5B, MetaLeft),
+        (0x5C, MetaRight),
         // Punctuation
-        (0xBD, Minus), (0xBB, Equal), (0xDB, BracketLeft), (0xDD, BracketRight),
-        (0xDC, Backslash), (0xBA, Semicolon), (0xDE, Quote), (0xC0, Backquote),
-        (0xBC, Comma), (0xBE, Period), (0xBF, Slash),
+        (0xBD, Minus),
+        (0xBB, Equal),
+        (0xDB, BracketLeft),
+        (0xDD, BracketRight),
+        (0xDC, Backslash),
+        (0xBA, Semicolon),
+        (0xDE, Quote),
+        (0xC0, Backquote),
+        (0xBC, Comma),
+        (0xBE, Period),
+        (0xBF, Slash),
         (0x5D, ContextMenu),
     ];
 
@@ -285,7 +360,11 @@ mod tests {
         assert_eq!(letter_vks.len(), 26);
         for vk in letter_vks {
             let hid = vk_to_hid(vk);
-            assert_ne!(hid, HidKeyCode::Unknown, "VK 0x{vk:02X} must have a HID mapping");
+            assert_ne!(
+                hid,
+                HidKeyCode::Unknown,
+                "VK 0x{vk:02X} must have a HID mapping"
+            );
         }
     }
 

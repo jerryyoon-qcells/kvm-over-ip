@@ -43,9 +43,7 @@ use kvm_core::protocol::messages::MonitorInfo;
 #[cfg(target_os = "windows")]
 use windows::{
     Win32::Foundation::{BOOL, LPARAM, RECT},
-    Win32::Graphics::Gdi::{
-        EnumDisplayMonitors, GetMonitorInfoW, HMONITOR, HDC, MONITORINFOEXW,
-    },
+    Win32::Graphics::Gdi::{EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFOEXW},
 };
 
 /// Windows implementation of [`PlatformScreenEnumerator`] using Win32 APIs.
