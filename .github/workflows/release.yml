@@ -388,7 +388,7 @@ jobs:
           echo "Info.plist injected successfully."
 
       # Create the .dmg using hdiutil (create-dmg tool is not installed by default).
-      # We use hdiutil directly here for CI reliability.
+      # We use hdiutil create -srcfolder for macOS 15+ compatibility.
       - name: Create .dmg disk image
         run: |
           VERSION="${{ github.ref_name }}"
@@ -397,33 +397,22 @@ jobs:
           BUNDLE_PATH="src/target/release/bundle/osx/KVM-Over-IP Client.app"
 
           mkdir -p dist/macos
-
-          # Calculate bundle size with 20% headroom for the DMG.
-          SIZE_MB=$(du -sm "${BUNDLE_PATH}" | cut -f1)
-          SIZE_MB=$(( SIZE_MB * 6 / 5 + 20 ))
-
-          TMP_DMG="dist/macos/${DMG_NAME}-rw.dmg"
           FINAL_DMG="dist/macos/${DMG_NAME}.dmg"
 
-          # Create a writable DMG.
+          # Stage the .app bundle and an Applications symlink into a temp folder.
+          STAGING_DIR="$(mktemp -d)"
+          cp -R "${BUNDLE_PATH}" "${STAGING_DIR}/"
+          ln -s /Applications "${STAGING_DIR}/Applications"
+
+          # Create a compressed read-only DMG directly from the staging folder.
           hdiutil create \
-            -size "${SIZE_MB}m" \
-            -fs "HFS+" \
             -volname "KVM-Over-IP ${APP_VERSION}" \
-            -format UDRW \
-            "${TMP_DMG}"
+            -srcfolder "${STAGING_DIR}" \
+            -ov \
+            -format UDZO \
+            "${FINAL_DMG}"
 
-          # Mount and populate it.
-          hdiutil attach "${TMP_DMG}" -mountpoint /Volumes/KVMOverIP_build
-
-          cp -R "${BUNDLE_PATH}" /Volumes/KVMOverIP_build/
-          ln -s /Applications /Volumes/KVMOverIP_build/Applications
-
-          hdiutil detach /Volumes/KVMOverIP_build
-
-          # Convert to compressed read-only DMG.
-          hdiutil convert "${TMP_DMG}" -format UDZO -o "${FINAL_DMG}"
-          rm -f "${TMP_DMG}"
+          rm -rf "${STAGING_DIR}"
 
           echo "DMG created: ${FINAL_DMG}"
           echo "DMG_PATH=${FINAL_DMG}" >> "$GITHUB_ENV"

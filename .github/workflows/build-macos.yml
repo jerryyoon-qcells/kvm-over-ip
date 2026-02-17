@@ -161,29 +161,23 @@ jobs:
           BUNDLE_PATH="src/target/release/bundle/osx/KVM-Over-IP Client.app"
 
           mkdir -p dist/macos
-
-          # Calculate bundle size with headroom
-          SIZE_MB=$(du -sm "${BUNDLE_PATH}" | cut -f1)
-          SIZE_MB=$(( SIZE_MB * 6 / 5 + 20 ))
-
-          TMP_DMG="dist/macos/${DMG_NAME}-rw.dmg"
           FINAL_DMG="dist/macos/${DMG_NAME}.dmg"
 
+          # Stage the .app bundle and an Applications symlink into a temp folder.
+          # hdiutil create -srcfolder reads this folder to produce the DMG.
+          STAGING_DIR="$(mktemp -d)"
+          cp -R "${BUNDLE_PATH}" "${STAGING_DIR}/"
+          ln -s /Applications "${STAGING_DIR}/Applications"
+
+          # Create a compressed read-only DMG directly from the staging folder.
           hdiutil create \
-            -size "${SIZE_MB}m" \
-            -fs "HFS+" \
             -volname "KVM-Over-IP ${APP_VERSION}" \
-            -format UDRW \
-            "${TMP_DMG}"
+            -srcfolder "${STAGING_DIR}" \
+            -ov \
+            -format UDZO \
+            "${FINAL_DMG}"
 
-          hdiutil attach "${TMP_DMG}" -mountpoint /Volumes/KVMOverIP_build
-          cp -R "${BUNDLE_PATH}" /Volumes/KVMOverIP_build/
-          ln -s /Applications /Volumes/KVMOverIP_build/Applications
-          hdiutil detach /Volumes/KVMOverIP_build
-
-          hdiutil convert "${TMP_DMG}" -format UDZO -o "${FINAL_DMG}"
-          rm -f "${TMP_DMG}"
-
+          rm -rf "${STAGING_DIR}"
           echo "DMG created: ${FINAL_DMG}"
 
       - name: Stage artefacts
