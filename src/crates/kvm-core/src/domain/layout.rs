@@ -408,9 +408,9 @@ impl VirtualLayout {
 
             let at_edge = match adj.from_edge {
                 Edge::Right => local_x >= from_region.width as i32 - EDGE_THRESHOLD,
-                Edge::Left => local_x <= EDGE_THRESHOLD - 1,
+                Edge::Left => local_x < EDGE_THRESHOLD,
                 Edge::Bottom => local_y >= from_region.height as i32 - EDGE_THRESHOLD,
-                Edge::Top => local_y <= EDGE_THRESHOLD - 1,
+                Edge::Top => local_y < EDGE_THRESHOLD,
             };
 
             if !at_edge {

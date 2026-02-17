@@ -94,14 +94,17 @@ fn enumerate_via_core_graphics() -> Result<Vec<MonitorInfo>, ScreenInfoError> {
     // Determine the primary display height for Y-axis flip.
     // CGMainDisplayID() returns the display with the menu bar.
     let primary_id = CGDisplay::main().id;
-    let primary_bounds = CGDisplayBounds(primary_id);
+    // SAFETY: CGDisplayBounds is a CoreGraphics C function that reads display metadata.
+    // It requires a valid display ID which we obtained from CGGetActiveDisplayList above.
+    let primary_bounds = unsafe { CGDisplayBounds(primary_id) };
     let primary_height = primary_bounds.size.height as i32;
 
     let mut monitors: Vec<MonitorInfo> = active_displays
         .iter()
         .enumerate()
         .map(|(i, &display_id)| {
-            let bounds = CGDisplayBounds(display_id);
+            // SAFETY: display_id comes from CGGetActiveDisplayList, guaranteed valid.
+            let bounds = unsafe { CGDisplayBounds(display_id) };
             let width = bounds.size.width as u32;
             let height = bounds.size.height as u32;
             let x_offset = bounds.origin.x as i32;

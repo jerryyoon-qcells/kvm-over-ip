@@ -42,6 +42,8 @@
     "dist/",
     "node_modules/",
     "vite.config.ts",
-    "jest.config.ts"
+    "jest.config.ts",
+    "src/__tests__/",
+    "src/__mocks__/"
   ]
 }
