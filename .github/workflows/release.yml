@@ -101,7 +101,7 @@ jobs:
     steps:
       # Step 1: Check out the code at the tagged commit.
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Step 2: Install the Rust stable toolchain.
       - name: Install Rust stable toolchain
@@ -109,7 +109,7 @@ jobs:
 
       # Step 3: Restore the Cargo registry cache to speed up dependency downloads.
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry/index
@@ -192,7 +192,7 @@ jobs:
 
       # Step 10: Upload the archive as a workflow artefact.
       - name: Upload Windows artefacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-windows-x86_64
           path: ${{ env.ARCHIVE }}
@@ -206,7 +206,7 @@ jobs:
           find src/target/wix -name "*.msi" 2>/dev/null || echo "No MSI files found in src/target/wix"
 
       - name: Upload kvm-master MSI
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: installer-kvm-master-windows
           # cargo-wix names the MSI after the package with the version: kvm-master-<ver>-x86_64.msi
@@ -225,7 +225,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -240,7 +240,7 @@ jobs:
             libxtst-dev
 
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry/index
@@ -310,7 +310,7 @@ jobs:
           echo "ARCHIVE=${STAGING}.tar.gz" >> "$GITHUB_ENV"
 
       - name: Upload Linux artefacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-linux-x86_64
           path: ${{ env.ARCHIVE }}
@@ -318,7 +318,7 @@ jobs:
 
       # Upload .deb files as separate named artefacts.
       - name: Upload .deb packages as separate artefacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: installer-linux-deb
           path: src/target/debian/*.deb
@@ -336,13 +336,13 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry/index
@@ -441,7 +441,7 @@ jobs:
           echo "ARCHIVE=${STAGING}.tar.gz" >> "$GITHUB_ENV"
 
       - name: Upload macOS artefacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-macos-aarch64
           path: ${{ env.ARCHIVE }}
@@ -449,7 +449,7 @@ jobs:
 
       # Upload the .dmg as a separate named artefact for easy direct download.
       - name: Upload .dmg as separate artefact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: installer-macos-dmg
           path: dist/macos/*.dmg
@@ -473,7 +473,7 @@ jobs:
 
     steps:
       - name: Check out repository (for changelog context)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -481,7 +481,7 @@ jobs:
       # The `pattern: release-*` matches all three archive artefacts.
       # `merge-multiple: true` places all files in a single `dist/` directory.
       - name: Download all platform archives
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: release-*
           path: dist/
@@ -489,7 +489,7 @@ jobs:
 
       # Download installer packages into a separate directory.
       - name: Download installer packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: installer-*
           path: installers/
