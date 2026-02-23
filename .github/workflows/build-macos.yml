@@ -35,13 +35,13 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry/index
@@ -52,7 +52,7 @@ jobs:
             macos-cargo-registry-
 
       - name: Cache Cargo build target directory
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: src/target
           key: macos-cargo-target-${{ hashFiles('src/**/Cargo.lock', 'src/Cargo.toml') }}
@@ -190,7 +190,7 @@ jobs:
           ls -lh staging/
 
       - name: Upload macOS package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: macos-package
           path: staging/*
