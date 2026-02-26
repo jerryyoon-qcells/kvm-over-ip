@@ -29,7 +29,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Unique identifiers
 uuid = { version = "1", features = ["v4", "serde"] }
 # Configuration
-toml = "0.8"
+toml = "1.0"
 # WebSocket support (used by kvm-web-bridge)
 tokio-tungstenite = { version = "0.24", features = ["connect"] }
 # JSON serialization (used by kvm-web-bridge for the browser-facing protocol)
