@@ -19,7 +19,7 @@ license = "MIT"
 tokio = { version = "1.35", features = ["full"] }
 # Serialization
 serde = { version = "1", features = ["derive"] }
-bincode = "1"
+bincode = "3"
 # Error handling
 thiserror = "1"
 anyhow = "1"
