@@ -89,7 +89,7 @@ jobs:
     steps:
       # Step 1: Check out the repository so the workflow has access to the code.
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Step 2: Install the Rust toolchain.
       #   `stable` is the current stable release of Rust.
@@ -106,7 +106,7 @@ jobs:
       #   The cache key includes the OS and the hash of all Cargo.lock files so
       #   the cache is invalidated when dependencies change.
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry/index
@@ -146,7 +146,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -164,7 +164,7 @@ jobs:
             libxtst-dev
 
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry/index
@@ -179,7 +179,7 @@ jobs:
       #   of all Cargo.toml/Cargo.lock files. If any of these change, the cache
       #   is busted and Cargo rebuilds from scratch.
       - name: Cache Cargo build target directory
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: src/target
           key: ${{ runner.os }}-cargo-target-clippy-${{ hashFiles('src/**/Cargo.toml', 'src/**/Cargo.lock') }}
@@ -226,7 +226,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -243,7 +243,7 @@ jobs:
             libxtst-dev
 
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry/index
@@ -257,7 +257,7 @@ jobs:
       # maintain their own independent caches (compiled artifacts are not
       # portable between OSes).
       - name: Cache Cargo build target directory
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: src/target
           key: ${{ runner.os }}-cargo-target-build-${{ hashFiles('src/**/Cargo.toml', 'src/**/Cargo.lock') }}
@@ -314,14 +314,14 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Install the Node.js version that matches the project's requirements.
       #   LTS 20 is the current Long-Term Support release (stable and well-
       #   supported). `cache: 'npm'` enables the built-in npm dependency cache
       #   provided by the setup-node action, keyed on package-lock.json.
       - name: Set up Node.js 20 (LTS)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -370,10 +370,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js 20 (LTS)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
